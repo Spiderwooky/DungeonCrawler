@@ -1,0 +1,39 @@
+using UnityEngine;
+
+/// <summary>
+/// ScriptableObject définissant un type d'ennemi.
+/// Créer via : clic droit dans le Project > Create > Enemy > Enemy Data
+/// Exemples : Goblin.asset, Troll.asset, Squelette.asset…
+/// </summary>
+[CreateAssetMenu(fileName = "NewEnemyData", menuName = "Enemy/Enemy Data")]
+public class EnemyData : ScriptableObject
+{
+    [Header("Identité")]
+    [Tooltip("Nom affiché en jeu.")]
+    public string enemyName = "Ennemi";
+
+    [Tooltip("Description courte (lore, journal du joueur…).")]
+    [TextArea(2, 4)]
+    public string description = "";
+
+    [Tooltip("Prefab 3D instancié dans la scène pour cet ennemi.")]
+    public GameObject model;
+
+    [Header("Stats")]
+    [Tooltip("Points de vie maximum.")]
+    [Min(1)] public int maxHealth = 10;
+
+    [Tooltip("Dégâts infligés par attaque.")]
+    [Min(0)] public int attackDamage = 2;
+
+    [Header("Déplacement")]
+    [Tooltip("Nombre de cases parcourues par tour (1 = une case par tour).")]
+    [Min(1)] public int moveRange = 1;
+
+    [Header("Détection")]
+    [Tooltip("Rayon en nombre de cases au-delà duquel l'ennemi ne voit pas le joueur.")]
+    [Min(1)] public int detectionRadius = 4;
+
+    [Tooltip("Rayon en nombre de cases à partir duquel l'ennemi peut attaquer.")]
+    [Min(1)] public int attackRadius = 1;
+}
