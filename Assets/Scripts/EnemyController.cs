@@ -128,7 +128,11 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     public void OnTurnStart()
     {
-        if (data == null || healthSystem == null || healthSystem.IsDead) return;
+        if (data == null || healthSystem == null || healthSystem.IsDead)
+        {
+            TurnManager.Instance?.EndTurn();
+            return;
+        }
         StartCoroutine(TakeTurn());
     }
 

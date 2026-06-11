@@ -39,6 +39,9 @@ public class TurnManager : MonoBehaviour
  
     // Liste des acteurs ennemis enregistrés
     private readonly List<ITurnActor> enemyActors = new List<ITurnActor>();
+
+    // Index du prochain ennemi à jouer pendant la phase Ennemis
+    private int nextEnemyIndex;
  
     // Référence au joueur (un seul joueur pour l'instant)
     private ITurnActor playerActor;
@@ -92,40 +95,53 @@ public class TurnManager : MonoBehaviour
         {
             case TurnOwner.Player:
                 currentTurn = TurnOwner.Enemies;
+                OnTurnChanged?.Invoke(currentTurn);
+                StartEnemyPhase();
                 break;
+
             case TurnOwner.Enemies:
-                roundNumber++;
-                currentTurn = TurnOwner.Player;
-                OnRoundStarted?.Invoke(roundNumber);
+                AdvanceEnemyTurn();
                 break;
         }
- 
-        BeginCurrentTurn();
     }
- 
+
     private void BeginCurrentTurn()
     {
         OnTurnChanged?.Invoke(currentTurn);
- 
+
         switch (currentTurn)
         {
             case TurnOwner.Player:
                 playerActor?.OnTurnStart();
                 break;
- 
+
             case TurnOwner.Enemies:
-                if (enemyActors.Count == 0)
-                {
-                    // Pas d'ennemis : on passe immédiatement au tour suivant
-                    EndTurn();
-                    return;
-                }
-                foreach (ITurnActor enemy in enemyActors)
-                {
-                    enemy.OnTurnStart();
-                }
+                StartEnemyPhase();
                 break;
         }
+    }
+
+    // Lance la phase ennemis : un seul ennemi joue à la fois.
+    private void StartEnemyPhase()
+    {
+        nextEnemyIndex = 0;
+        AdvanceEnemyTurn();
+    }
+
+    // Passe au prochain ennemi, ou rend la main au joueur si tous ont joué.
+    private void AdvanceEnemyTurn()
+    {
+        while (nextEnemyIndex < enemyActors.Count)
+        {
+            ITurnActor enemy = enemyActors[nextEnemyIndex++];
+            enemy.OnTurnStart();
+            return;
+        }
+
+        roundNumber++;
+        currentTurn = TurnOwner.Player;
+        OnRoundStarted?.Invoke(roundNumber);
+        BeginCurrentTurn();
     }
  
     // ──────────────────────────────────────────

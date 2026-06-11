@@ -6,6 +6,7 @@ using System.Collections;
 public class CopilotPlayerController : MonoBehaviour, ITurnActor
 {
     [SerializeField] private GameManager gameManager;
+    [SerializeField] private Inventory inventory;
  
     [Header("Animation")]
     [SerializeField] private float moveDuration         = 0.3f;
@@ -35,16 +36,19 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
  
         if (audioSource == null)
             Debug.LogWarning("[PlayerController] Pas d'AudioSource : le son de bump ne jouera pas.");
- 
-        // Enregistrement auprès du TurnManager (s'il existe)
-        if (TurnManager.Instance != null)
-            TurnManager.Instance.RegisterPlayer(this);
-        else
-            Debug.LogWarning("[PlayerController] TurnManager introuvable : mode tour-par-tour désactivé.");
+
+        if (inventory == null)
+            inventory = GetComponent<Inventory>();
     }
  
     private void Start()
     {
+        // Enregistrement après tous les Awake() (TurnManager.Instance est alors disponible).
+        if (TurnManager.Instance != null)
+            TurnManager.Instance.RegisterPlayer(this);
+        else
+            Debug.LogWarning("[PlayerController] TurnManager introuvable : mode tour-par-tour désactivé.");
+
         // La grille est garantie initialisée ici car GameManager.Awake() s'est exécuté en premier.
         int[] s = gameManager.GetStart();
         float step = gameManager.GetStep();
@@ -145,7 +149,20 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
         characterController.enabled = true;
  
         isMoving = false;
+        TryPickupAtCurrentCell();
         EndMyTurn(); // ← Fin de tour après un déplacement réussi
+    }
+
+    private void TryPickupAtCurrentCell()
+    {
+        if (inventory == null || gameManager == null) return;
+
+        float step = gameManager.GetStep();
+        var grid = new Vector2Int(
+            Mathf.RoundToInt(transform.position.x / step),
+            Mathf.RoundToInt(transform.position.z / step));
+
+        PickupManager.Instance?.TryCollectAt(grid, inventory);
     }
  
     private IEnumerator BumpAgainstWall(Vector3 direction)
