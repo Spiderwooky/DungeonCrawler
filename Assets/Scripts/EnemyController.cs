@@ -94,6 +94,14 @@ public class EnemyController : MonoBehaviour, ITurnActor
             {
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlayEnemyDeath();
+
+                // ========== VÉRIFICATION MUSIQUE À LA MORT ==========
+                // Si cet ennemi était en état de combat, vérifier s'il y a d'autres ennemis
+                // Si aucun ennemi n'est plus en chasse/attaque, revenir à l'exploration
+                if (AudioManager.Instance != null && currentState == EnemyState.Chase || currentState == EnemyState.Attack)
+                {
+                    AudioManager.Instance.PlayMusicExploration();
+                }
             };
         }
     }
