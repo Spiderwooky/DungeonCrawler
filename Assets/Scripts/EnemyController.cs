@@ -76,6 +76,26 @@ public class EnemyController : MonoBehaviour, ITurnActor
         }
 
         healthSystem?.Initialize(data.maxHealth);
+
+        // ========== INTÉGRATION AUDIO ENNEMI ==========
+        // S'abonner aux événements de santé de cet ennemi
+        // Permet de jouer les sons d'impact et de mort automatiquement
+        if (healthSystem != null)
+        {
+            // OnDamaged : appelé chaque fois que l'ennemi reçoit des dégâts
+            healthSystem.OnDamaged += (currentHealth, maxHealth) => 
+            {
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlayEnemyDamage();
+            };
+
+            // OnDeath : appelé quand les PV de l'ennemi tombent à 0
+            healthSystem.OnDeath += () => 
+            {
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlayEnemyDeath();
+            };
+        }
     }
 
     private void Start()
@@ -160,6 +180,26 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
         Debug.Log($"[{data.enemyName}] État : {currentState} | Distance joueur : {GridDistance(gridPosition, playerGrid)}");
 
+        // ========== TRANSITION MUSICALE ==========
+        // Quand l'ennemi détecte le joueur → musique de combat
+        // Quand l'ennemi perd le joueur → retour à l'exploration
+        if (currentState == EnemyState.Chase || currentState == EnemyState.Attack)
+        {
+            // Passer en mode combat (musique change)
+            if (AudioManager.Instance != null && !AudioManager.Instance.IsInCombat)
+            {
+                AudioManager.Instance.PlayMusicCombat();
+            }
+        }
+        else if (currentState == EnemyState.Wander)
+        {
+            // Retour au mode exploration (ennemi a perdu le joueur)
+            if (AudioManager.Instance != null && AudioManager.Instance.IsInCombat)
+            {
+                AudioManager.Instance.PlayMusicExploration();
+            }
+        }
+
         // ── 2. Agir selon l'état ─────────────────
         switch (currentState)
         {
@@ -189,6 +229,11 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     private IEnumerator DoAttack(Vector2Int playerGrid)
     {
+        // ========== SON D'ATTAQUE ==========
+        // Jouer un son d'attaque avant le bump visuel
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayAttack();
+
         Debug.Log($"[{data.enemyName}] Attaque le joueur pour {data.attackDamage} dégâts !");
 
         // Petit bump visuel vers le joueur
@@ -197,6 +242,7 @@ public class EnemyController : MonoBehaviour, ITurnActor
         yield return StartCoroutine(AnimateBump(transform.position, bumpTarget, 0.15f));
 
         // Infliger les dégâts via HealthSystem
+        // Les sons de dégâts/mort sont gérés automatiquement par HealthSystem.OnDamaged/OnDeath
         HealthSystem playerHealth = playerTransform.GetComponent<HealthSystem>();
         if (playerHealth != null)
             playerHealth.TakeDamage(data.attackDamage);

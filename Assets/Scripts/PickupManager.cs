@@ -49,6 +49,7 @@ public class PickupManager : MonoBehaviour
             return false;
 
         pickup.Collect();
+        AudioManager.EnsureInstance()?.PlayPickupItem();
         return true;
     }
 }

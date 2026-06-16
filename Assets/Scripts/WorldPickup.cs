@@ -91,6 +91,8 @@ public class WorldPickup : MonoBehaviour
         pickup.SnapToGrid();
         WorldPickup.EnsurePickupManagerExists();
         pickup.RegisterAtGridPosition();
+        // Jouer un son de dépôt quand un objet est spawn dans le monde
+        AudioManager.EnsureInstance()?.PlayDropItem();
         return pickup;
     }
 

@@ -39,6 +39,32 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
 
         if (inventory == null)
             inventory = GetComponent<Inventory>();
+
+        // ========== INTÉGRATION AUDIO ==========
+        // S'abonner aux événements de santé du joueur
+        // Quand le joueur prend des dégâts → joue un son d'impact
+        // Quand le joueur meurt → joue un son de mort
+        HealthSystem healthSystem = GetComponent<HealthSystem>();
+        if (healthSystem != null)
+        {
+            // OnDamaged est appelé chaque fois que le joueur reçoit des dégâts
+            healthSystem.OnDamaged += (currentHealth, maxHealth) => 
+            {
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlayPlayerHit();
+            };
+
+            // OnDeath est appelé quand les PV du joueur tombent à 0
+            healthSystem.OnDeath += () => 
+            {
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlayPlayerDeath();
+            };
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerController] HealthSystem manquant sur le joueur !");
+        }
     }
  
     private void Start()
@@ -130,6 +156,12 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     private IEnumerator MoveToPosition(Vector3 targetPosition)
     {
         isMoving = true;
+
+        // ========== SON DE PAS ==========
+        // Jouer un bruit de pas dès que le joueur commence à se déplacer
+        // PlayFootstep() choisit aléatoirement dans le tableau sfxFootsteps
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayFootstep();
  
         Vector3 startPosition = transform.position;
         float elapsed = 0f;
@@ -169,8 +201,11 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     {
         isMoving = true;
  
-        if (audioSource != null && bumpClip != null)
-            audioSource.PlayOneShot(bumpClip);
+        // ========== SON DE COLLISION ==========
+        // Utiliser l'AudioManager centralisé au lieu d'un AudioSource local
+        // Permet une meilleure gestion des volumes et des transitions sonores
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayWallBump();
  
         Vector3 start      = transform.position;
         Vector3 bumpTarget = start + direction * gameManager.GetStep() * bumpDistanceMultiplier;

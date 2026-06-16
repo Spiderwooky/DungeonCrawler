@@ -36,11 +36,6 @@ public class Inventory : MonoBehaviour
     [Header("Références")]
     [SerializeField] private GameManager gameManager;
 
-    [Header("Audio")]
-    [SerializeField] private AudioClip pickupClip;
-    [SerializeField] private AudioClip dropClip;
-
-    private AudioSource audioSource;
     private InventorySlot[] hotbarSlots;
     private InventorySlot[] backpackSlots;
 
@@ -70,8 +65,6 @@ public class Inventory : MonoBehaviour
 
     private void Awake()
     {
-        audioSource = GetComponent<AudioSource>();
-
         if (gameManager == null)
             gameManager = FindFirstObjectByType<GameManager>();
 
@@ -84,7 +77,7 @@ public class Inventory : MonoBehaviour
         if (PickupManager.Instance == null) return false;
         if (!PickupManager.Instance.TryCollectAt(grid, this)) return false;
 
-        PlayClip(pickupClip);
+        AudioManager.EnsureInstance()?.PlayPickupItem();
         return true;
     }
 
@@ -254,19 +247,12 @@ public class Inventory : MonoBehaviour
         float step = gameManager.GetStep();
         Vector3 worldPos = new Vector3(grid.x * step, 0f, grid.y * step);
         WorldPickup.Spawn(item, dropAmount, worldPos);
-
-        PlayClip(dropClip);
         OnInventoryChanged?.Invoke();
         return true;
     }
 
     public bool DropSelectedItem() => DropFromHotbar(selectedHotbarIndex);
 
-    private void PlayClip(AudioClip clip)
-    {
-        if (clip == null || audioSource == null) return;
-        audioSource.PlayOneShot(clip);
-    }
 
     public Vector2Int WorldToGrid(Vector3 worldPos)
     {
