@@ -13,8 +13,8 @@ MonoBehaviour:
   m_Name: GoblinData
   m_EditorClassIdentifier: 
   enemyName: Goblin
-  description: "Un m\xE9chant goblin agrougour."
-  model: {fileID: 6758924080255805056, guid: 15d47ddc66af7ca428bcaff18a79f0c5, type: 3}
+  description: "Un m\xE9chant goblin agrougrou."
+  model: {fileID: 9114406610070881733, guid: b9ce600144e84ee4bacf62f9b1f5fb18, type: 3}
   maxHealth: 10
   attackDamage: 2
   moveRange: 1

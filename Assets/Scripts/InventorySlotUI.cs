@@ -83,7 +83,7 @@ public class InventorySlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         bool hideIconWhileDragging)
     {
         if (background != null)
-            background.color = new Color(0.12f, 0.12f, 0.12f, 0.85f);
+            background.color = new Color(1f, 1f, 1f, 1f);
 
         if (selectionHighlight != null)
             selectionHighlight.gameObject.SetActive(isHotbarSelected);

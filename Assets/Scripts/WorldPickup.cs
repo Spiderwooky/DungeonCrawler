@@ -128,12 +128,20 @@ public class WorldPickup : MonoBehaviour
     {
         if (GetComponentInChildren<Renderer>() != null) return;
 
-        GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        visual.name = "Visual";
-        visual.transform.SetParent(transform, false);
-        visual.transform.localPosition = Vector3.up * 0.5f;
-        visual.transform.localScale = Vector3.one * 0.6f;
-        Destroy(visual.GetComponent<Collider>());
+        if (itemData != null && itemData.worldPickupPrefab != null)
+        {
+            GameObject visual = Instantiate(itemData.worldPickupPrefab, transform);
+            visual.name = "Visual";
+            visual.transform.localPosition = Vector3.zero;
+            return;
+        }
+
+        GameObject fallbackVisual = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        fallbackVisual.name = "Visual";
+        fallbackVisual.transform.SetParent(transform, false);
+        fallbackVisual.transform.localPosition = Vector3.up * 0.5f;
+        fallbackVisual.transform.localScale = Vector3.one * 0.6f;
+        Destroy(fallbackVisual.GetComponent<Collider>());
     }
 
     private static void EnsurePickupManagerExists()

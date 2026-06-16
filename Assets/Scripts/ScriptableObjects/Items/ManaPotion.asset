@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   itemName: ManaPotion
   description: Une potion de mana basique.
-  icon: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
+  icon: {fileID: 21300000, guid: d863a14933408f64bb5abb867bf2b9f6, type: 3}
   maxStack: 1
-  worldPickupPrefab: {fileID: 0}
+  worldPickupPrefab: {fileID: 82815371171145111, guid: 71564a7a58ddd964cb4793de8fac5e35, type: 3}
