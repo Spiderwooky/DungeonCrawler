@@ -14,9 +14,10 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     [SerializeField] private float rotationAngle        = 90f;
     [SerializeField] private float bumpDistanceMultiplier = 0.25f;
     [SerializeField] private float bumpDuration         = 0.15f;
+
+    [Header("Combat")]
+    [SerializeField] private int attackDamage = 2;
  
-    [Header("Audio")]
-    [SerializeField] private AudioClip bumpClip;
  
     private AudioSource      audioSource;
     private CharacterController characterController;
@@ -141,7 +142,15 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
         if (!isMyTurn || isMoving || isRotating) return;
  
         Vector3 targetPosition = transform.position + direction * gameManager.GetStep();
- 
+
+        // Si une entité ennemie est sur la case cible → attaquer au lieu de se déplacer
+        EnemyController enemy = GetEnemyAtPosition(targetPosition);
+        if (enemy != null)
+        {
+            StartCoroutine(AttackEnemy(enemy, direction));
+            return;
+        }
+
         if (IsCellWalkable(targetPosition))
         {
             StartCoroutine(MoveToPosition(targetPosition));
@@ -151,6 +160,84 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
             StartCoroutine(BumpAgainstWall(direction));
             // Le bump ne consomme pas de tour
         }
+    }
+
+    // Cherche un EnemyController dont la position monde correspond à la case cible.
+    private EnemyController GetEnemyAtPosition(Vector3 targetPosition)
+    {
+        // On peut comparer les positions snapées (les ennemis sont alignés sur la grille)
+        float step = gameManager.GetStep();
+        int tx = Mathf.RoundToInt(targetPosition.x / step);
+        int tz = Mathf.RoundToInt(targetPosition.z / step);
+
+        EnemyController[] enemies = FindObjectsOfType<EnemyController>();
+        foreach (var e in enemies)
+        {
+            if (e == null) continue;
+            Vector3 p = e.transform.position;
+            int ex = Mathf.RoundToInt(p.x / step);
+            int ez = Mathf.RoundToInt(p.z / step);
+            if (ex == tx && ez == tz) return e;
+        }
+
+        return null;
+    }
+
+    // Animer un bump sur la même distance que le bump contre un mur.
+    private IEnumerator DoBump(Vector3 direction)
+    {
+        Vector3 start = transform.position;
+        Vector3 bumpTarget = start + direction * gameManager.GetStep() * bumpDistanceMultiplier;
+        float half = bumpDuration * 0.5f;
+        float elapsed = 0f;
+
+        while (elapsed < half)
+        {
+            float t = Mathf.Clamp01(elapsed / half);
+            characterController.Move(Vector3.Lerp(start, bumpTarget, t) - transform.position);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        elapsed = 0f;
+        while (elapsed < half)
+        {
+            float t = Mathf.Clamp01(elapsed / half);
+            characterController.Move(Vector3.Lerp(bumpTarget, start, t) - transform.position);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        // Snap de sécurité
+        characterController.enabled = false;
+        transform.position = start;
+        characterController.enabled = true;
+    }
+
+    // Attaque une entité ennemie : même animation de bump que contre un mur, puis inflige des dégâts.
+    private IEnumerator AttackEnemy(EnemyController enemy, Vector3 direction)
+    {
+        if (enemy == null) yield break;
+
+        isMoving = true;
+
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayAttack();
+
+        yield return StartCoroutine(DoBump(direction));
+
+        HealthSystem enemyHealth = enemy.GetComponent<HealthSystem>();
+        if (enemyHealth != null)
+        {
+            enemyHealth.TakeDamage(attackDamage);
+        }
+        else
+        {
+            Debug.LogWarning("[Player] Ennemi sans HealthSystem trouvé lors de l'attaque.");
+        }
+
+        isMoving = false;
+        EndMyTurn();
     }
  
     private IEnumerator MoveToPosition(Vector3 targetPosition)
