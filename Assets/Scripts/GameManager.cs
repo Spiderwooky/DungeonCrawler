@@ -6,6 +6,11 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private GridGenerator gridGenerator;
  
+    [Header("Procedural Generation")]
+    [Tooltip("Optional reference to a BspDungeonGenerator to generate the grid procedurally.")]
+    [SerializeField]
+    private BspDungeonGenerator bspGenerator;
+
     [SerializeField]
     private TurnManager turnManager;
  
@@ -21,6 +26,11 @@ public class GameManager : MonoBehaviour
     [Header("Ground")]
     [SerializeField]
     private GameObject groundModel;
+
+    [Header("Spawning")]
+    [Tooltip("Minimum allowed distance (in grid cells) between player and enemies.")]
+    [SerializeField]
+    private int minEnemyDistance = 5;
  
     [Header("Wall Variants")]
     [SerializeField] private GameObject wallPillar;
@@ -66,9 +76,118 @@ public class GameManager : MonoBehaviour
             Debug.LogError("Ground model is missing on GameManager.");
             return;
         }
+
+        // Auto-create or auto-assign a BspDungeonGenerator if none provided
+        if (bspGenerator == null)
+        {
+            // Try to find an existing generator in the scene
+            var found = Object.FindObjectsByType<BspDungeonGenerator>(FindObjectsSortMode.None);
+            if (found != null && found.Length > 0)
+            {
+                bspGenerator = found[0];
+                Debug.Log("[GameManager] Assigned existing BspDungeonGenerator found in scene.");
+            }
+            else
+            {
+                // Create a dedicated child GameObject to hold the generator
+                GameObject go = new GameObject("BspDungeonGenerator");
+                go.transform.SetParent(this.transform);
+                bspGenerator = go.AddComponent<BspDungeonGenerator>();
+                Debug.Log("[GameManager] Created new BspDungeonGenerator GameObject and assigned it.");
+            }
+        }
  
         GenerateGridDefinition();
+        // Ensure player and enemies have coherent start positions based on the generated grid
+        AssignStartPositionsFromGrid();
+
         gridGenerator.GenerateGridAndTerrain(this);
+    }
+
+    // Assign player start and enemy starts/patrol centers based on available ground cells
+    private void AssignStartPositionsFromGrid()
+    {
+        if (gridDefinition == null) return;
+
+        // Collect all ground cells
+        var groundCells = new System.Collections.Generic.List<Vector2Int>();
+        for (int x = 0; x < gridDefinition.Length; x++)
+        {
+            for (int z = 0; z < gridDefinition[x].Length; z++)
+            {
+                if (gridDefinition[x][z] != null && gridDefinition[x][z].IsGround())
+                    groundCells.Add(new Vector2Int(x, z));
+            }
+        }
+
+        if (groundCells.Count == 0)
+        {
+            Debug.LogWarning("[GameManager] No ground cells found to place player/enemies.");
+            return;
+        }
+
+        // Choose player start near the center of the grid if possible
+        int centerX = gridDefinition.Length / 2;
+        int centerZ = gridDefinition[0].Length / 2;
+        Vector2Int playerCell = FindNearestGround(centerX, centerZ, groundCells);
+        start[0] = playerCell.x;
+        start[1] = playerCell.y;
+
+        // Assign enemies to random distinct ground cells (unique, not overlapping player)
+        EnemyController[] enemies = Object.FindObjectsByType<EnemyController>(FindObjectsSortMode.None);
+        var rnd = new System.Random();
+        var usedCells = new System.Collections.Generic.HashSet<Vector2Int>();
+        usedCells.Add(playerCell);
+
+        foreach (var enemy in enemies)
+        {
+            Vector2Int chosen = playerCell;
+
+            // Build list of candidates that are unused and satisfy minimum distance from player
+            var validCandidates = new System.Collections.Generic.List<Vector2Int>();
+            foreach (var c in groundCells)
+            {
+                if (usedCells.Contains(c)) continue;
+                if (Vector2Int.Distance(c, playerCell) >= minEnemyDistance)
+                {
+                    validCandidates.Add(c);
+                }
+            }
+
+            if (validCandidates.Count > 0)
+            {
+                chosen = validCandidates[rnd.Next(validCandidates.Count)];
+            }
+            else
+            {
+                // Fallback: pick any unused ground cell if no candidate meets the distance
+                var unused = new System.Collections.Generic.List<Vector2Int>();
+                foreach (var c in groundCells) if (!usedCells.Contains(c)) unused.Add(c);
+                if (unused.Count > 0)
+                {
+                    chosen = unused[rnd.Next(unused.Count)];
+                }
+            }
+
+            usedCells.Add(chosen);
+            enemy.SetStartAndPatrol(chosen, chosen);
+        }
+    }
+
+    private Vector2Int FindNearestGround(int x, int z, System.Collections.Generic.List<Vector2Int> groundCells)
+    {
+        Vector2Int best = groundCells[0];
+        float bestDist = Vector2Int.Distance(best, new Vector2Int(x, z));
+        foreach (var c in groundCells)
+        {
+            float d = Vector2Int.Distance(c, new Vector2Int(x, z));
+            if (d < bestDist)
+            {
+                bestDist = d;
+                best = c;
+            }
+        }
+        return best;
     }
  
     // ──────────────────────────────────────────
@@ -94,6 +213,16 @@ public class GameManager : MonoBehaviour
     public void GenerateGridDefinition()
     {
         if (gridDefinition != null) return;
+
+        // If a BSP generator is provided, use its procedurally generated grid.
+        if (bspGenerator != null)
+        {
+            // Force generation (safe even if bspGenerator already ran in Awake)
+            bspGenerator.GenerateDungeon();
+            gridDefinition = bspGenerator.GetDungeonGrid();
+            ValidateStartPosition();
+            return;
+        }
  
         Case g = new Case(CellType.Ground);
         Case w = new Case(CellType.Wall);
@@ -159,7 +288,7 @@ public class GameManager : MonoBehaviour
             new Case[14] { w, w, w, w, w, w, w, g, w, g, g, g, g, w },
             // col 14 — bord est
             new Case[14] { w, w, w, w, w, w, w, w, w, w, w, w, w, w },
-};
+        };
  
         ValidateStartPosition();
     }

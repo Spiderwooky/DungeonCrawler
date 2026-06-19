@@ -1,0 +1,759 @@
+using System.Collections.Generic;
+using System.Text;
+using UnityEngine;
+
+// Générateur de donjon simple inspiré du partitionnement BSP.
+// Il crée des salles avec des formes variées et des piliers intérieurs.
+public class BspDungeonGenerator : MonoBehaviour
+{
+    public enum RoomShape
+    {
+        Rectangle,
+        Ellipse,
+        Union
+        ,Random
+    }
+
+    [Header("Dimensions de la grille")]
+    [Tooltip("Largeur de la grille en cases (axe X)")]
+    public int width = 15;
+
+    [Tooltip("Hauteur de la grille en cases (axe Z)")]
+    public int height = 14;
+
+    [Header("Paramètres de la génération")]
+    [Tooltip("Taille minimale d'un bloc BSP pour pouvoir le diviser")]
+    public int minLeafSize = 6;
+
+    [Tooltip("Taille minimale d'une salle à l'intérieur d'une feuille BSP")]
+    public int minRoomSize = 3;
+
+    [Tooltip("Taille maximale d'une salle à l'intérieur d'une feuille BSP")]
+    public int maxRoomSize = 8;
+
+    [Tooltip("Forme des salles générées dans chaque feuille BSP")]
+    public RoomShape roomShape = RoomShape.Union;
+
+    [Tooltip("Chance de placer un pilier (une case mur isolée) dans les salles")]
+    [Range(0f, 1f)]
+    public float pillarChance = 0.08f;
+
+    [Header("Room Shape Weights (used when RoomShape.Random is selected)")]
+    [Tooltip("Relative weight for selecting Union shapes")]
+    public float unionWeight = 0.5f;
+
+    [Tooltip("Relative weight for selecting Ellipse shapes")]
+    public float ellipseWeight = 0.25f;
+
+    [Tooltip("Relative weight for selecting Rectangle shapes")]
+    public float rectangleWeight = 0.25f;
+
+    [Tooltip("Clé de génération fixe si useRandomSeed est false")]
+    public int seed = 0;
+
+    [Tooltip("Utiliser une graine aléatoire à chaque exécution")]
+    public bool useRandomSeed = true;
+
+    [Header("Couloirs")]
+    [Tooltip("Chance qu'une arête supplémentaire soit ajoutée au graphe des couloirs")]
+    [Range(0f, 1f)]
+    public float extraEdgeChance = 0.25f;
+
+    [Tooltip("Nombre minimum de liaisons supplémentaires créées au-delà du MST")]
+    public int minExtraEdges = 1;
+
+    [Tooltip("Nombre maximum de liaisons supplémentaires créées au-delà du MST")]
+    public int maxExtraEdges = 5;
+
+    private Case[][] grid;
+    private System.Random random;
+    private readonly Case wallCase = new Case(CellType.Wall);
+    private readonly Case groundCase = new Case(CellType.Ground);
+    private static readonly Vector2Int[] Directions =
+    {
+        Vector2Int.up,
+        Vector2Int.down,
+        Vector2Int.left,
+        Vector2Int.right,
+    };
+
+    private void Awake()
+    {
+        GenerateDungeon();
+        LogGridToConsole();
+    }
+
+    public Case[][] GetDungeonGrid()
+    {
+        if (grid == null)
+        {
+            GenerateDungeon();
+        }
+        return grid;
+    }
+
+    [Header("Gizmos")]
+    [Tooltip("Taille en unités monde d'une case pour le dessin des gizmos (doit correspondre à GameManager.step)")]
+    public float gizmoCellSize = 5f;
+
+    [Tooltip("Dessiner les gizmos en mode édition (OnDrawGizmos). Si false, les gizmos ne sont dessinés qu'en PlayMode.")]
+    public bool drawGizmosInEditor = true;
+
+    private void OnDrawGizmos()
+    {
+        if (!drawGizmosInEditor && !Application.isPlaying) return;
+
+        if (grid == null)
+        {
+            // Générer une grille de prévisualisation si nécessaire
+            GenerateDungeon();
+        }
+
+        if (grid == null) return;
+
+        // Dessiner chaque case sol en vert clair et les murs en gris léger
+        for (int x = 0; x < grid.Length; x++)
+        {
+            for (int z = 0; z < grid[x].Length; z++)
+            {
+                Vector3 pos = new Vector3(x * gizmoCellSize, 0.1f, z * gizmoCellSize);
+                if (grid[x][z] != null && grid[x][z].IsGround())
+                {
+                    Gizmos.color = new Color(0.2f, 0.8f, 0.2f, 0.6f);
+                    Gizmos.DrawCube(pos, new Vector3(gizmoCellSize, 0.1f, gizmoCellSize));
+                }
+                else
+                {
+                    // Optionnel : dessiner les murs plus faiblement
+                    Gizmos.color = new Color(0.5f, 0.5f, 0.5f, 0.08f);
+                    Gizmos.DrawCube(pos, new Vector3(gizmoCellSize, 0.02f, gizmoCellSize));
+                }
+            }
+        }
+    }
+
+    public void GenerateDungeon()
+    {
+        if (width < minLeafSize || height < minLeafSize)
+        {
+            Debug.LogError("La grille est trop petite pour la génération BSP. Vérifiez width/height et minLeafSize.");
+            return;
+        }
+
+        random = useRandomSeed ? new System.Random() : new System.Random(seed);
+        InitializeGrid();
+
+        Leaf root = new Leaf(0, 0, width, height);
+        List<Leaf> leaves = SplitLeaves(root);
+        CreateRooms(leaves);
+        CarveRooms(leaves);
+        ConnectRooms(leaves);
+    }
+
+    private void InitializeGrid()
+    {
+        grid = new Case[width][];
+        for (int x = 0; x < width; x++)
+        {
+            grid[x] = new Case[height];
+            for (int z = 0; z < height; z++)
+            {
+                grid[x][z] = wallCase;
+            }
+        }
+    }
+
+    private List<Leaf> SplitLeaves(Leaf root)
+    {
+        List<Leaf> leaves = new List<Leaf> { root };
+        bool didSplit = true;
+
+        while (didSplit)
+        {
+            didSplit = false;
+            for (int i = 0; i < leaves.Count; i++)
+            {
+                // Ne traiter que les feuilles terminales
+                if (leaves[i].IsSplit) continue;
+
+                // Si la feuille peut être divisée selon la taille minimale, on la divise.
+                // On retire la condition aléatoire pour garantir que la partition
+                // progresse jusqu'à ce que toutes les feuilles soient trop petites.
+                if (leaves[i].CanSplit(minLeafSize))
+                {
+                    if (leaves[i].Split(random, minLeafSize))
+                    {
+                        leaves.Add(leaves[i].Left);
+                        leaves.Add(leaves[i].Right);
+                        didSplit = true;
+                    }
+                }
+            }
+        }
+
+        // Ne garder que les feuilles terminales
+        return leaves.FindAll(leaf => !leaf.IsSplit);
+    }
+
+    private void CreateRooms(List<Leaf> leaves)
+    {
+        foreach (Leaf leaf in leaves)
+        {
+            // Déterminer des limites sûres pour la taille des salles à l'intérieur de la feuille
+            int maxAvailableWidth = Mathf.Max(1, leaf.width - 2); // laisser 1 case de bordure de chaque côté
+            int maxAvailableHeight = Mathf.Max(1, leaf.height - 2);
+
+            int targetMaxWidth = Mathf.Min(maxAvailableWidth, maxRoomSize);
+            int targetMaxHeight = Mathf.Min(maxAvailableHeight, maxRoomSize);
+
+            int roomWidth;
+            if (minRoomSize >= targetMaxWidth)
+                roomWidth = targetMaxWidth;
+            else
+                roomWidth = random.Next(minRoomSize, targetMaxWidth + 1);
+
+            int roomHeight;
+            if (minRoomSize >= targetMaxHeight)
+                roomHeight = targetMaxHeight;
+            else
+                roomHeight = random.Next(minRoomSize, targetMaxHeight + 1);
+
+            // Calculer une position de salle sûre (avec au moins 1 case de marge)
+            int maxOffsetX = Mathf.Max(1, leaf.width - roomWidth - 1);
+            int offsetX = (maxOffsetX <= 1) ? 1 : random.Next(1, maxOffsetX + 1);
+
+            int maxOffsetZ = Mathf.Max(1, leaf.height - roomHeight - 1);
+            int offsetZ = (maxOffsetZ <= 1) ? 1 : random.Next(1, maxOffsetZ + 1);
+
+            int roomX = leaf.x + offsetX;
+            int roomZ = leaf.z + offsetZ;
+
+            leaf.room = new RectInt(roomX, roomZ, roomWidth, roomHeight);
+            leaf.roomShape = roomShape == RoomShape.Random ? PickRandomRoomShapeForLeaf(leaf, roomWidth, roomHeight) : roomShape;
+
+            if (roomShape == RoomShape.Union && roomWidth >= minRoomSize * 2 - 1 && roomHeight >= minRoomSize * 2 - 1)
+            {
+                bool horizontal = random.NextDouble() > 0.5;
+                if (horizontal)
+                {
+                    int widthA = random.Next(minRoomSize, roomWidth - minRoomSize + 2);
+                    widthA = Mathf.Clamp(widthA, minRoomSize, roomWidth - minRoomSize + 1);
+                    int widthB = roomWidth - widthA + 1;
+                    int splitOffsetZ = random.Next(0, Mathf.Max(1, roomHeight - minRoomSize + 1));
+                    int heightB = random.Next(minRoomSize, roomHeight - splitOffsetZ + 1);
+                    heightB = Mathf.Clamp(heightB, minRoomSize, roomHeight - splitOffsetZ);
+
+                    leaf.roomA = new RectInt(roomX, roomZ, widthA, roomHeight);
+                    leaf.roomB = new RectInt(roomX + widthA - 1, roomZ + splitOffsetZ, widthB, heightB);
+                }
+                else
+                {
+                    int heightA = random.Next(minRoomSize, roomHeight - minRoomSize + 2);
+                    heightA = Mathf.Clamp(heightA, minRoomSize, roomHeight - minRoomSize + 1);
+                    int heightB = roomHeight - heightA + 1;
+                    int splitOffsetX = random.Next(0, Mathf.Max(1, roomWidth - minRoomSize + 1));
+                    int widthB = random.Next(minRoomSize, roomWidth - splitOffsetX + 1);
+                    widthB = Mathf.Clamp(widthB, minRoomSize, roomWidth - splitOffsetX);
+
+                    leaf.roomA = new RectInt(roomX, roomZ, roomWidth, heightA);
+                    leaf.roomB = new RectInt(roomX + splitOffsetX, roomZ + heightA - 1, widthB, heightB);
+                }
+            }
+            else
+            {
+                leaf.roomA = leaf.room;
+                leaf.roomB = null;
+            }
+        }
+    }
+
+    private RoomShape PickRandomRoomShape()
+    {
+        var values = new List<RoomShape> { RoomShape.Rectangle, RoomShape.Ellipse, RoomShape.Union };
+        return values[random.Next(values.Count)];
+    }
+
+    // Choisit une forme pour une feuille spécifique en tenant compte de la taille de la salle
+    private RoomShape PickRandomRoomShapeForLeaf(Leaf leaf, int roomWidth, int roomHeight)
+    {
+        bool canUnion = roomWidth >= minRoomSize * 2 && roomHeight >= minRoomSize * 2;
+        // Use configurable weights; if Union not allowed, treat its weight as zero
+        float wUnion = canUnion ? Mathf.Max(0f, unionWeight) : 0f;
+        float wEllipse = Mathf.Max(0f, ellipseWeight);
+        float wRectangle = Mathf.Max(0f, rectangleWeight);
+
+        float total = wUnion + wEllipse + wRectangle;
+        if (total <= 0f)
+        {
+            // fallback
+            return RoomShape.Rectangle;
+        }
+
+        double r = random.NextDouble() * total;
+        double acc = wUnion;
+        if (r < acc && wUnion > 0f) return RoomShape.Union;
+        acc += wEllipse;
+        if (r < acc && wEllipse > 0f) return RoomShape.Ellipse;
+        return RoomShape.Rectangle;
+    }
+
+    private void ConnectRooms(List<Leaf> leaves)
+    {
+        List<Vector2Int> roomCenters = new List<Vector2Int>();
+        foreach (Leaf leaf in leaves)
+        {
+            if (leaf.room.HasValue)
+            {
+                Vector2 center = leaf.room.Value.center;
+                roomCenters.Add(new Vector2Int(Mathf.RoundToInt(center.x), Mathf.RoundToInt(center.y)));
+            }
+        }
+
+        if (roomCenters.Count < 2) return;
+
+        List<Edge> edges = new List<Edge>();
+        for (int i = 0; i < roomCenters.Count; i++)
+        {
+            for (int j = i + 1; j < roomCenters.Count; j++)
+            {
+                float distance = Vector2Int.Distance(roomCenters[i], roomCenters[j]);
+                edges.Add(new Edge(i, j, distance));
+            }
+        }
+
+        edges.Sort((a, b) => a.weight.CompareTo(b.weight));
+
+        UnionFind unionFind = new UnionFind(roomCenters.Count);
+        List<Edge> corridorEdges = new List<Edge>();
+
+        // Construire un arbre couvrant minimum pour relier toutes les salles.
+        foreach (Edge edge in edges)
+        {
+            if (unionFind.Union(edge.a, edge.b))
+            {
+                corridorEdges.Add(edge);
+            }
+
+            if (corridorEdges.Count >= roomCenters.Count - 1)
+                break;
+        }
+
+        // Construire la liste des arêtes restantes non utilisées par le MST.
+        List<Edge> remainingEdges = new List<Edge>();
+        foreach (Edge edge in edges)
+        {
+            if (!corridorEdges.Contains(edge))
+            {
+                remainingEdges.Add(edge);
+            }
+        }
+
+        int extraAdded = 0;
+
+        // Première passe : garantir un nombre minimum d'arêtes supplémentaires.
+        for (int i = 0; i < remainingEdges.Count && extraAdded < minExtraEdges; i++)
+        {
+            corridorEdges.Add(remainingEdges[i]);
+            extraAdded++;
+        }
+
+        if (extraAdded < minExtraEdges)
+        {
+            Debug.LogWarning($"[BspDungeonGenerator] minExtraEdges={minExtraEdges} demandé, mais seulement {extraAdded} arêtes supplémentaires disponibles.");
+        }
+
+        // Deuxième passe : ajouter de nouvelles arêtes aléatoires jusqu'à maxExtraEdges.
+        for (int i = 0; i < remainingEdges.Count && extraAdded < maxExtraEdges; i++)
+        {
+            Edge edge = remainingEdges[i];
+            if (corridorEdges.Contains(edge)) continue;
+            if (random.NextDouble() < extraEdgeChance)
+            {
+                corridorEdges.Add(edge);
+                extraAdded++;
+            }
+        }
+
+        foreach (Edge edge in corridorEdges)
+        {
+            CarveCorridorBetween(roomCenters[edge.a], roomCenters[edge.b]);
+        }
+    }
+
+    private void CarveCorridorBetween(Vector2Int start, Vector2Int goal)
+    {
+        List<Vector2Int> path = FindCorridorPath(start, goal);
+        if (path == null) return;
+
+        foreach (Vector2Int pos in path)
+        {
+            grid[pos.x][pos.y] = groundCase;
+        }
+    }
+
+    private List<Vector2Int> FindCorridorPath(Vector2Int start, Vector2Int goal)
+    {
+        if (start == goal) return new List<Vector2Int> { start };
+
+        var openSet = new List<CorridorNode>();
+        var closedSet = new HashSet<Vector2Int>();
+        openSet.Add(new CorridorNode(start, null, 0f, Heuristic(start, goal)));
+
+        while (openSet.Count > 0)
+        {
+            CorridorNode current = openSet[0];
+            for (int i = 1; i < openSet.Count; i++)
+            {
+                if (openSet[i].F < current.F)
+                    current = openSet[i];
+            }
+
+            openSet.Remove(current);
+            closedSet.Add(current.Position);
+
+            if (current.Position == goal)
+            {
+                return ReconstructPath(current);
+            }
+
+            foreach (Vector2Int dir in Directions)
+            {
+                Vector2Int neighbor = current.Position + dir;
+                if (!IsInBounds(grid, neighbor)) continue;
+                if (closedSet.Contains(neighbor)) continue;
+
+                float moveCost = grid[neighbor.x][neighbor.y].IsWall() ? 5f : 1f;
+                float g = current.G + moveCost;
+                float h = Heuristic(neighbor, goal);
+                float f = g + h;
+
+                CorridorNode existing = openSet.Find(node => node.Position == neighbor);
+                if (existing != null)
+                {
+                    if (g < existing.G)
+                    {
+                        existing.G = g;
+                        existing.Parent = current;
+                    }
+                }
+                else
+                {
+                    openSet.Add(new CorridorNode(neighbor, current, g, h));
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private class CorridorNode
+    {
+        public Vector2Int Position;
+        public CorridorNode Parent;
+        public float G;
+        public float H;
+        public float F => G + H;
+
+        public CorridorNode(Vector2Int position, CorridorNode parent, float g, float h)
+        {
+            Position = position;
+            Parent = parent;
+            G = g;
+            H = h;
+        }
+    }
+
+    private class Edge
+    {
+        public int a;
+        public int b;
+        public float weight;
+
+        public Edge(int a, int b, float weight)
+        {
+            this.a = a;
+            this.b = b;
+            this.weight = weight;
+        }
+    }
+
+    private class UnionFind
+    {
+        private int[] parent;
+        public UnionFind(int size)
+        {
+            parent = new int[size];
+            for (int i = 0; i < size; i++) parent[i] = i;
+        }
+
+        public int Find(int x)
+        {
+            if (parent[x] == x) return x;
+            parent[x] = Find(parent[x]);
+            return parent[x];
+        }
+
+        public bool Union(int x, int y)
+        {
+            int rootX = Find(x);
+            int rootY = Find(y);
+            if (rootX == rootY) return false;
+            parent[rootY] = rootX;
+            return true;
+        }
+    }
+
+    private static float Heuristic(Vector2Int a, Vector2Int b)
+    {
+        return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
+    }
+
+    private static List<Vector2Int> ReconstructPath(CorridorNode node)
+    {
+        List<Vector2Int> path = new List<Vector2Int>();
+        while (node != null)
+        {
+            path.Add(node.Position);
+            node = node.Parent;
+        }
+        path.Reverse();
+        return path;
+    }
+
+    private static bool IsInBounds(Case[][] grid, Vector2Int pos)
+    {
+        return pos.x >= 0 && pos.x < grid.Length
+            && pos.y >= 0 && pos.y < grid[pos.x].Length;
+    }
+
+    private void CarveRooms(List<Leaf> leaves)
+    {
+        foreach (Leaf leaf in leaves)
+        {
+            if (!leaf.roomA.HasValue) continue;
+
+            if (leaf.roomShape == RoomShape.Union && leaf.roomB.HasValue)
+            {
+                CarveUnionRoom(leaf);
+            }
+            else if (leaf.roomShape == RoomShape.Ellipse)
+            {
+                CarveEllipseRoom(leaf.roomA.Value);
+            }
+            else
+            {
+                CarveRectangleRoom(leaf.roomA.Value);
+            }
+
+            if (pillarChance > 0f)
+            {
+                PlaceRoomPillars(leaf);
+            }
+        }
+    }
+
+    private void CarveRectangleRoom(RectInt room)
+    {
+        for (int x = room.xMin; x < room.xMax; x++)
+        {
+            for (int z = room.yMin; z < room.yMax; z++)
+            {
+                grid[x][z] = groundCase;
+            }
+        }
+    }
+
+    private void CarveUnionRoom(Leaf leaf)
+    {
+        CarveRectangleRoom(leaf.roomA.Value);
+        CarveRectangleRoom(leaf.roomB.Value);
+
+        Vector2Int connectorA = GetConnectorPoint(leaf.roomA.Value, leaf.roomB.Value);
+        Vector2Int connectorB = GetConnectorPoint(leaf.roomB.Value, leaf.roomA.Value);
+        CarveStraightCorridor(connectorA, connectorB);
+    }
+
+    private Vector2Int GetConnectorPoint(RectInt from, RectInt to)
+    {
+        int x = Mathf.Clamp(Mathf.RoundToInt(to.center.x), from.xMin, from.xMax - 1);
+        int z = Mathf.Clamp(Mathf.RoundToInt(to.center.y), from.yMin, from.yMax - 1);
+        return new Vector2Int(x, z);
+    }
+
+    private void CarveStraightCorridor(Vector2Int start, Vector2Int goal)
+    {
+        Vector2Int pos = start;
+        grid[pos.x][pos.y] = groundCase;
+
+        while (pos.x != goal.x)
+        {
+            pos.x += (goal.x > pos.x) ? 1 : -1;
+            grid[pos.x][pos.y] = groundCase;
+        }
+
+        while (pos.y != goal.y)
+        {
+            pos.y += (goal.y > pos.y) ? 1 : -1;
+            grid[pos.x][pos.y] = groundCase;
+        }
+    }
+
+    private void CarveEllipseRoom(RectInt room)
+    {
+        Vector2 center = new Vector2((room.xMin + room.xMax - 1) / 2f, (room.yMin + room.yMax - 1) / 2f);
+        float radiusX = room.width / 2f;
+        float radiusZ = room.height / 2f;
+
+        for (int x = room.xMin; x < room.xMax; x++)
+        {
+            for (int z = room.yMin; z < room.yMax; z++)
+            {
+                float normalizedX = (x - center.x) / radiusX;
+                float normalizedZ = (z - center.y) / radiusZ;
+                float radiusLimit = 1f + (Mathf.PerlinNoise((x + seed * 13) * 0.15f, (z + seed * 17) * 0.15f) - 0.5f) * 0.24f;
+                if (normalizedX * normalizedX + normalizedZ * normalizedZ <= radiusLimit)
+                {
+                    grid[x][z] = groundCase;
+                }
+            }
+        }
+    }
+
+    private void PlaceRoomPillars(Leaf leaf)
+    {
+        if (!leaf.roomA.HasValue) return;
+
+        PlacePillarsInArea(leaf.roomA.Value);
+        if (leaf.roomB.HasValue)
+        {
+            PlacePillarsInArea(leaf.roomB.Value);
+        }
+    }
+
+    private void PlacePillarsInArea(RectInt room)
+    {
+        for (int x = room.xMin + 1; x < room.xMax - 1; x++)
+        {
+            for (int z = room.yMin + 1; z < room.yMax - 1; z++)
+            {
+                if (random.NextDouble() < pillarChance && grid[x][z].IsGround())
+                {
+                    bool surroundedByGround = true;
+                    foreach (Vector2Int dir in Directions)
+                    {
+                        Vector2Int neighbor = new Vector2Int(x, z) + dir;
+                        if (!IsInBounds(grid, neighbor) || !grid[neighbor.x][neighbor.y].IsGround())
+                        {
+                            surroundedByGround = false;
+                            break;
+                        }
+                    }
+
+                    if (surroundedByGround)
+                    {
+                        grid[x][z] = wallCase;
+                    }
+                }
+            }
+        }
+    }
+
+    private void LogGridToConsole()
+    {
+        StringBuilder builder = new StringBuilder();
+        builder.AppendLine($"Dungeon {width}x{height} (rooms only, BSP)");
+
+        for (int z = height - 1; z >= 0; z--)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                builder.Append(grid[x][z].IsWall() ? 'W' : 'G');
+                builder.Append(' ');
+            }
+            builder.AppendLine();
+        }
+
+        Debug.Log(builder.ToString());
+    }
+
+    private class Leaf
+    {
+        public int x;
+        public int z;
+        public int width;
+        public int height;
+        public Leaf Left;
+        public Leaf Right;
+        public RectInt? room;
+        public RectInt? roomA;
+        public RectInt? roomB;
+        public RoomShape roomShape;
+
+        public bool IsSplit => Left != null || Right != null;
+
+        public Leaf(int x, int z, int width, int height)
+        {
+            this.x = x;
+            this.z = z;
+            this.width = width;
+            this.height = height;
+            this.Left = null;
+            this.Right = null;
+            this.room = null;
+        }
+
+        public bool CanSplit(int minSize)
+        {
+            return width >= minSize * 2 || height >= minSize * 2;
+        }
+
+        public bool Split(System.Random random, int minSize)
+        {
+            bool splitHorizontally = ChooseSplitDirection(random);
+            if (width < minSize * 2)
+            {
+                splitHorizontally = false;
+            }
+            else if (height < minSize * 2)
+            {
+                splitHorizontally = true;
+            }
+
+            if (splitHorizontally)
+            {
+                int min = minSize;
+                int max = height - minSize + 1; // exclusive upper bound for Random.Next
+                if (max <= min) return false;
+                int splitZ = random.Next(min, max);
+                if (splitZ <= 0 || splitZ >= height) return false;
+                Left = new Leaf(x, z, width, splitZ);
+                Right = new Leaf(x, z + splitZ, width, height - splitZ);
+                return true;
+            }
+            else
+            {
+                int min = minSize;
+                int max = width - minSize + 1; // exclusive upper bound for Random.Next
+                if (max <= min) return false;
+                int splitX = random.Next(min, max);
+                if (splitX <= 0 || splitX >= width) return false;
+                Left = new Leaf(x, z, splitX, height);
+                Right = new Leaf(x + splitX, z, width - splitX, height);
+                return true;
+            }
+        }
+
+        private bool ChooseSplitDirection(System.Random random)
+        {
+            if (width > height && width / (float)height >= 1.25f)
+            {
+                return false;
+            }
+            else if (height > width && height / (float)width >= 1.25f)
+            {
+                return true;
+            }
+            return random.NextDouble() > 0.5;
+        }
+    }
+}

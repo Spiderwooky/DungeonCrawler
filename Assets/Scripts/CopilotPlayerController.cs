@@ -170,7 +170,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
         int tx = Mathf.RoundToInt(targetPosition.x / step);
         int tz = Mathf.RoundToInt(targetPosition.z / step);
 
-        EnemyController[] enemies = FindObjectsOfType<EnemyController>();
+        EnemyController[] enemies = Object.FindObjectsByType<EnemyController>(FindObjectsSortMode.None);
         foreach (var e in enemies)
         {
             if (e == null) continue;

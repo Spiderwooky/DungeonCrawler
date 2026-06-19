@@ -150,6 +150,14 @@ public class EnemyController : MonoBehaviour, ITurnActor
         Debug.Log($"[{data.enemyName}] Zone de patrouille : {patrolCells.Count} cases autour de {patrolCenter}");
     }
 
+    // Permet à un gestionnaire externe (GameManager) d'initialiser
+    // la position de départ et le centre de patrouille avant Start().
+    public void SetStartAndPatrol(Vector2Int startPos, Vector2Int patrolCenterPos)
+    {
+        start = startPos;
+        patrolCenter = patrolCenterPos;
+    }
+
     // ──────────────────────────────────────────
     // ITurnActor
     // ──────────────────────────────────────────
