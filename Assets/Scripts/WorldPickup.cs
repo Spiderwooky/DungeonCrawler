@@ -111,20 +111,9 @@ public class WorldPickup : MonoBehaviour
         transform.position = GridToWorld(gridPosition);
     }
 
-    private Vector3 GridToWorld(Vector2Int gridPos)
-    {
-        float step = gameManager.GetStep();
-        return new Vector3(gridPos.x * step, 0f, gridPos.y * step);
-    }
+    private Vector3 GridToWorld(Vector2Int gridPos) => GridUtils.GridToWorld(gridPos, gameManager.GetStep());
 
-    private Vector2Int WorldToGrid(Vector3 worldPos)
-    {
-        float step = gameManager.GetStep();
-        return new Vector2Int(
-            Mathf.RoundToInt(worldPos.x / step),
-            Mathf.RoundToInt(worldPos.z / step)
-        );
-    }
+    private Vector2Int WorldToGrid(Vector3 worldPos) => GridUtils.WorldToGrid(worldPos, gameManager.GetStep());
 
     private void EnsureVisual()
     {

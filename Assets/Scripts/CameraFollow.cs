@@ -1,5 +1,7 @@
 using UnityEngine;
- 
+
+// Caméra à la troisième personne : suit le joueur avec un décalage relatif à sa rotation
+// et un lissage SmoothDamp (pas de mouvement de caméra brusque entre deux cases).
 public class CameraFollow : MonoBehaviour
 {
     [SerializeField] private Transform player;

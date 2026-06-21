@@ -1,19 +1,24 @@
 using UnityEngine;
- 
+
+// Instancie le terrain 3D à partir de la grille fournie par GameManager.
+// Un seul prefab de sol (FloorTile) est utilisé pour toutes les cases praticables : ses
+// décorations de bord (murs pleins / petits coins diagonaux / pilier) sont activées au cas
+// par cas selon les voisins, pour donner un rendu organique plutôt qu'une grille de blocs.
+// Les cases mur "normales" ne génèrent aucun GameObject.
 public class GridGenerator : MonoBehaviour
 {
     private Case[][] grid;
     private GameManager gameManager;
- 
+
     public Case[][] GetGrid() => grid;
- 
+
     public void GenerateGridAndTerrain(GameManager gm)
     {
         gameManager = gm;
         grid = gameManager.GetGridDefinition();
         GenerateTerrain();
     }
- 
+
     private void GenerateTerrain()
     {
         if (gameManager == null)
@@ -21,119 +26,114 @@ public class GridGenerator : MonoBehaviour
             Debug.LogError("GameManager reference is null in GridGenerator.");
             return;
         }
- 
+
         if (grid == null)
         {
             Debug.LogError("Grid was not generated.");
             return;
         }
- 
+
         float step = gameManager.GetStep();
         GameObject terrainParent = gameManager.GetTerrain();
-        WallModels models = gameManager.GetModels();
- 
-        ValidateModels(models);
- 
+        GameObject floorPrefab = gameManager.GetFloorPrefab();
+
+        if (!ValidateFloorPrefab(floorPrefab)) return;
+
         for (int i = 0; i < grid.Length; i++)
         {
             for (int j = 0; j < grid[i].Length; j++)
             {
                 Case cell = grid[i][j];
                 if (cell == null) continue;
- 
-                GameObject prefab = GetPrefabForCell(cell, i, j, models);
-                if (prefab == null)
-                {
-                    Debug.LogWarning($"Aucun prefab trouvé pour la case ({i},{j}). Utilisation du sol par défaut.");
-                    prefab = models.ground;
-                }
- 
+
+                // Une case mur isolée (entourée de sol) se reclasse en sol-avec-pilier ;
+                // une case mur "normale" ne génère rien du tout.
+                bool isPillarCell = !cell.IsGround() && IsIsolatedWallPillar(i, j);
+                if (!cell.IsGround() && !isPillarCell) continue;
+
                 Vector3 position = new Vector3(i * step, 0f, j * step);
-                GameObject instance = Instantiate(prefab, position, Quaternion.identity, terrainParent.transform);
- 
+                GameObject instance = Instantiate(floorPrefab, position, Quaternion.identity, terrainParent.transform);
+
+                ConfigureTile(instance, i, j, isPillarCell);
+
                 // La case connaît maintenant son modèle instancié dans la scène
                 cell.SetModel(instance);
             }
         }
     }
- 
-    // Choisit le prefab approprié selon le type de cellule et ses voisins murs.
-    private GameObject GetPrefabForCell(Case cell, int x, int z, WallModels models)
+
+    // Active les bonnes décorations de bord (murs/coins/pilier) sur la tuile instanciée.
+    private void ConfigureTile(GameObject instance, int x, int z, bool hasPillar)
     {
-        if (!cell.IsWall())
+        FloorTile floorTile = instance.GetComponent<FloorTile>();
+        if (floorTile == null)
         {
-            return models.ground;
+            Debug.LogError($"[GridGenerator] Le prefab de sol n'a pas de composant FloorTile (case {x},{z}).");
+            return;
         }
- 
-        bool north = IsWallAt(x, z + 1);
-        bool south = IsWallAt(x, z - 1);
-        bool east  = IsWallAt(x + 1, z);
-        bool west  = IsWallAt(x - 1, z);
- 
-        int neighborCount = (north ? 1 : 0) + (south ? 1 : 0) + (east ? 1 : 0) + (west ? 1 : 0);
- 
-        switch (neighborCount)
-        {
-            case 0:
-                return models.pillar;
- 
-            case 1:
-                if (north) return models.endNorth;
-                if (south) return models.endSouth;
-                if (east)  return models.endEast;
-                return models.endWest;
- 
-            case 2:
-                if (north && south) return models.straightNS;
-                if (east  && west)  return models.straightEW;
-                if (north && east)  return models.cornerNE;
-                if (east  && south) return models.cornerSE;
-                if (south && west)  return models.cornerSW;
-                if (west  && north) return models.cornerNW;
-                return models.pillar; // fallback explicite (ne devrait pas arriver)
- 
-            case 3:
-                if (!north) return models.tNoNorth;
-                if (!east)  return models.tNoEast;
-                if (!south) return models.tNoSouth;
-                return models.tNoWest; // !west implicite, return explicite
- 
-            case 4:
-                return models.cross;
- 
-            default:
-                return models.pillar;
-        }
+
+        bool north = IsBlockingWallAt(x, z + 1);
+        bool south = IsBlockingWallAt(x, z - 1);
+        bool east  = IsBlockingWallAt(x + 1, z);
+        bool west  = IsBlockingWallAt(x - 1, z);
+
+        // Un petit coin diagonal ne s'affiche que si aucun des deux murs cardinaux adjacents
+        // à cette diagonale n'est déjà plein (sinon il couvre déjà l'angle).
+        bool cornerNE = !north && !east && IsBlockingWallAt(x + 1, z + 1);
+        bool cornerNW = !north && !west && IsBlockingWallAt(x - 1, z + 1);
+        bool cornerSE = !south && !east && IsBlockingWallAt(x + 1, z - 1);
+        bool cornerSW = !south && !west && IsBlockingWallAt(x - 1, z - 1);
+
+        floorTile.Configure(north, south, east, west, cornerNE, cornerNW, cornerSE, cornerSW, hasPillar);
     }
- 
+
+    // Un mur "bloquant" doit être affiché chez ses voisins ; un mur isolé (pilier) ne doit
+    // pas l'être, puisqu'il se reclasse lui-même en sol-avec-pilier.
+    private bool IsBlockingWallAt(int x, int z) => IsWallAt(x, z) && !IsIsolatedWallPillar(x, z);
+
+    // Vrai si la case (x,z) est un mur entouré de sol sur ses 4 côtés cardinaux
+    // (même définition que BspDungeonGenerator.PlaceRoomPillars.surroundedByGround).
+    private bool IsIsolatedWallPillar(int x, int z)
+    {
+        if (!IsWallAt(x, z)) return false;
+
+        return IsGroundAt(x, z + 1) && IsGroundAt(x, z - 1)
+            && IsGroundAt(x + 1, z) && IsGroundAt(x - 1, z);
+    }
+
     private bool IsWallAt(int x, int z)
     {
         if (x < 0 || z < 0 || x >= grid.Length || z >= grid[x].Length)
             return false;
- 
+
         Case cell = grid[x][z];
         return cell != null && cell.IsWall();
     }
- 
-    // Vérifie en amont que tous les prefabs obligatoires sont assignés dans l'Inspector.
-    private void ValidateModels(WallModels models)
+
+    // Une case hors-grille ne compte pas comme du sol (elle ne peut donc pas qualifier un mur comme isolé).
+    private bool IsGroundAt(int x, int z)
     {
-        if (models.ground     == null) Debug.LogError("[GridGenerator] Prefab 'ground' manquant !");
-        if (models.pillar     == null) Debug.LogError("[GridGenerator] Prefab 'pillar' manquant !");
-        if (models.straightNS == null) Debug.LogError("[GridGenerator] Prefab 'straightNS' manquant !");
-        if (models.straightEW == null) Debug.LogError("[GridGenerator] Prefab 'straightEW' manquant !");
-        if (models.cornerNE   == null) Debug.LogError("[GridGenerator] Prefab 'cornerNE' manquant !");
-        if (models.cornerNW   == null) Debug.LogError("[GridGenerator] Prefab 'cornerNW' manquant !");
-        if (models.cornerSE   == null) Debug.LogError("[GridGenerator] Prefab 'cornerSE' manquant !");
-        if (models.cornerSW   == null) Debug.LogError("[GridGenerator] Prefab 'cornerSW' manquant !");
-        if (models.tNoNorth   == null) Debug.LogError("[GridGenerator] Prefab 'tNoNorth' manquant !");
-        if (models.tNoEast    == null) Debug.LogError("[GridGenerator] Prefab 'tNoEast' manquant !");
-        if (models.tNoSouth   == null) Debug.LogError("[GridGenerator] Prefab 'tNoSouth' manquant !");
-        if (models.tNoWest    == null) Debug.LogError("[GridGenerator] Prefab 'tNoWest' manquant !");
-        if (models.cross      == null) Debug.LogError("[GridGenerator] Prefab 'cross' manquant !");
-        if (models.endNorth   == null) Debug.LogError("[GridGenerator] Prefab 'endNorth' manquant !");
-        if (models.endEast    == null) Debug.LogError("[GridGenerator] Prefab 'endEast' manquant !");
-        if (models.endSouth   == null) Debug.LogError("[GridGenerator] Prefab 'endSouth' manquant !");
-        if (models.endWest    == null) Debug.LogError("[GridGenerator] Prefab 'endWest' manquant !");
+        if (x < 0 || z < 0 || x >= grid.Length || z >= grid[x].Length)
+            return false;
+
+        Case cell = grid[x][z];
+        return cell != null && cell.IsGround();
+    }
+
+    private bool ValidateFloorPrefab(GameObject floorPrefab)
+    {
+        if (floorPrefab == null)
+        {
+            Debug.LogError("[GridGenerator] Floor prefab manquant sur GameManager.");
+            return false;
+        }
+
+        if (floorPrefab.GetComponent<FloorTile>() == null)
+        {
+            Debug.LogError("[GridGenerator] Le floor prefab n'a pas de composant FloorTile.");
+            return false;
+        }
+
+        return true;
     }
 }

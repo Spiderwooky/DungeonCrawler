@@ -1,12 +1,14 @@
 using UnityEngine;
- 
+
 // Représente le type d'une case de la grille.
 public enum CellType
 {
     Ground, // Case praticable
     Wall,   // Mur
 }
- 
+
+// Une case de la grille de jeu : son type (sol/mur) et le GameObject 3D instancié pour
+// la représenter dans la scène. Les grilles sont des tableaux Case[x][z].
 public class Case
 {
     private CellType cellType;

@@ -1,7 +1,10 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using System.Collections;
- 
+
+// Contrôleur joueur actif (déplacement/rotation/attaque case par case via le New Input
+// System). Implémente ITurnActor : termine son tour via TurnManager après un déplacement
+// ou une attaque réussis. Un bump (mur ou rotation) ne consomme pas le tour.
 [RequireComponent(typeof(PlayerInput), typeof(CharacterController), typeof(HealthSystem))]
 public class CopilotPlayerController : MonoBehaviour, ITurnActor
 {
@@ -17,9 +20,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
 
     [Header("Combat")]
     [SerializeField] private int attackDamage = 2;
- 
- 
-    private AudioSource      audioSource;
+
     private CharacterController characterController;
  
     private bool isMoving;
@@ -33,15 +34,11 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     private void Awake()
     {
         characterController = GetComponent<CharacterController>();
-        audioSource         = GetComponent<AudioSource>();
- 
-        if (audioSource == null)
-            Debug.LogWarning("[PlayerController] Pas d'AudioSource : le son de bump ne jouera pas.");
 
         if (inventory == null)
             inventory = GetComponent<Inventory>();
 
-        // ========== INTÉGRATION AUDIO ==========
+        // ── Intégration audio ──
         // S'abonner aux événements de santé du joueur
         // Quand le joueur prend des dégâts → joue un son d'impact
         // Quand le joueur meurt → joue un son de mort
@@ -77,12 +74,11 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
             Debug.LogWarning("[PlayerController] TurnManager introuvable : mode tour-par-tour désactivé.");
 
         // La grille est garantie initialisée ici car GameManager.Awake() s'est exécuté en premier.
-        int[] s = gameManager.GetStart();
-        float step = gameManager.GetStep();
- 
+        Vector2Int startCell = gameManager.GetStart();
+
         // Désactiver le CharacterController le temps du snap pour éviter les conflits
         characterController.enabled = false;
-        transform.position = new Vector3(s[0] * step, 0f, s[1] * step);
+        transform.position = GridUtils.GridToWorld(startCell, gameManager.GetStep());
         characterController.enabled = true;
     }
  
@@ -165,25 +161,22 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     // Cherche un EnemyController dont la position monde correspond à la case cible.
     private EnemyController GetEnemyAtPosition(Vector3 targetPosition)
     {
-        // On peut comparer les positions snapées (les ennemis sont alignés sur la grille)
+        // On compare les positions snapées sur la grille (les ennemis y sont toujours alignés)
         float step = gameManager.GetStep();
-        int tx = Mathf.RoundToInt(targetPosition.x / step);
-        int tz = Mathf.RoundToInt(targetPosition.z / step);
+        Vector2Int targetCell = GridUtils.WorldToGrid(targetPosition, step);
 
         EnemyController[] enemies = Object.FindObjectsByType<EnemyController>(FindObjectsSortMode.None);
         foreach (var e in enemies)
         {
             if (e == null) continue;
-            Vector3 p = e.transform.position;
-            int ex = Mathf.RoundToInt(p.x / step);
-            int ez = Mathf.RoundToInt(p.z / step);
-            if (ex == tx && ez == tz) return e;
+            if (GridUtils.WorldToGrid(e.transform.position, step) == targetCell) return e;
         }
 
         return null;
     }
 
-    // Animer un bump sur la même distance que le bump contre un mur.
+    // Anime un aller-retour vers `direction` (sans déplacer réellement le joueur).
+    // Partagé par BumpAgainstWall (collision) et AttackEnemy (coup porté).
     private IEnumerator DoBump(Vector3 direction)
     {
         Vector3 start = transform.position;
@@ -244,9 +237,8 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     {
         isMoving = true;
 
-        // ========== SON DE PAS ==========
         // Jouer un bruit de pas dès que le joueur commence à se déplacer
-        // PlayFootstep() choisit aléatoirement dans le tableau sfxFootsteps
+        // (PlayFootstep choisit aléatoirement dans le tableau sfxFootsteps)
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayFootstep();
  
@@ -276,55 +268,22 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     {
         if (inventory == null || gameManager == null) return;
 
-        float step = gameManager.GetStep();
-        var grid = new Vector2Int(
-            Mathf.RoundToInt(transform.position.x / step),
-            Mathf.RoundToInt(transform.position.z / step));
-
+        Vector2Int grid = GridUtils.WorldToGrid(transform.position, gameManager.GetStep());
         PickupManager.Instance?.TryCollectAt(grid, inventory);
     }
  
+    // Bump contre un mur : même animation aller-retour que AttackEnemy, mais avec le son
+    // de collision. Ne termine PAS le tour : le joueur peut réessayer immédiatement.
     private IEnumerator BumpAgainstWall(Vector3 direction)
     {
         isMoving = true;
- 
-        // ========== SON DE COLLISION ==========
-        // Utiliser l'AudioManager centralisé au lieu d'un AudioSource local
-        // Permet une meilleure gestion des volumes et des transitions sonores
+
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayWallBump();
- 
-        Vector3 start      = transform.position;
-        Vector3 bumpTarget = start + direction * gameManager.GetStep() * bumpDistanceMultiplier;
-        float   half       = bumpDuration * 0.5f;
-        float   elapsed    = 0f;
- 
-        // Aller vers le mur
-        while (elapsed < half)
-        {
-            float t = Mathf.Clamp01(elapsed / half);
-            characterController.Move(Vector3.Lerp(start, bumpTarget, t) - transform.position);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
- 
-        // Revenir à la position de départ
-        elapsed = 0f;
-        while (elapsed < half)
-        {
-            float t = Mathf.Clamp01(elapsed / half);
-            characterController.Move(Vector3.Lerp(bumpTarget, start, t) - transform.position);
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
- 
-        // Snap de sécurité
-        characterController.enabled = false;
-        transform.position = start;
-        characterController.enabled = true;
- 
+
+        yield return StartCoroutine(DoBump(direction));
+
         isMoving = false;
-        // Le bump ne termine PAS le tour : le joueur peut réessayer
     }
  
     // ──────────────────────────────────────────
@@ -368,17 +327,14 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
  
     private bool IsCellWalkable(Vector3 targetPosition)
     {
-        float step = gameManager.GetStep();
-        int x = Mathf.RoundToInt(targetPosition.x / step);
-        int z = Mathf.RoundToInt(targetPosition.z / step);
- 
+        Vector2Int cellPos = GridUtils.WorldToGrid(targetPosition, gameManager.GetStep());
         Case[][] grid = gameManager.GetGridDefinition();
- 
+
         // Vérification des bornes avant l'accès au tableau
-        if (x < 0 || x >= grid.Length)        return false;
-        if (z < 0 || z >= grid[x].Length)     return false;
- 
-        Case cell = grid[x][z];
+        if (cellPos.x < 0 || cellPos.x >= grid.Length)           return false;
+        if (cellPos.y < 0 || cellPos.y >= grid[cellPos.x].Length) return false;
+
+        Case cell = grid[cellPos.x][cellPos.y];
         return cell != null && !cell.IsWall();
     }
 }

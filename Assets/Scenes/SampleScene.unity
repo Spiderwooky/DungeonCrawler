@@ -316,7 +316,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 526.33496, y: -472.29706}
+  m_AnchoredPosition: {x: 526.33496, y: -582.16376}
   m_SizeDelta: {x: 811.578, y: 142.397}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &186489889
@@ -1139,7 +1139,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!108 &410087040
 Light:
   m_ObjectHideFlags: 0
@@ -1720,27 +1720,11 @@ MonoBehaviour:
   gridGenerator: {fileID: 1069331090}
   bspGenerator: {fileID: 1069331094}
   turnManager: {fileID: 1773646326}
-  start: 010000000100000000000000
+  start: {x: 1, y: 1}
   step: 4
   terrain: {fileID: 1473142879}
-  groundModel: {fileID: 919132149155446097, guid: da6ab90c37c9b0c4386365f3c82340e0, type: 3}
+  floorPrefab: {fileID: 6497442536950605917, guid: 74b508f76eae25845ae23531972aa326, type: 3}
   minEnemyDistance: 5
-  wallPillar: {fileID: 8665674180584710846, guid: 302a2746b44f78d4682e4b05350aa3cf, type: 3}
-  wallStraightNS: {fileID: 8560143795237352831, guid: 2a288684c7f08e34aaabad88d51ecfca, type: 3}
-  wallStraightEW: {fileID: 7807525126591903920, guid: 32f6f8c6aab752a499944047b897723c, type: 3}
-  wallCornerNE: {fileID: 805732442201704089, guid: 4dc8d4ac7c8d0314aa6e36dcc5dbf6eb, type: 3}
-  wallCornerNW: {fileID: 6752490180497460611, guid: 2929efb0fed9bd04697d8c46bd43887a, type: 3}
-  wallCornerSE: {fileID: 5855392571404048994, guid: 93b402d225b284d499bf58d7b1b08fb7, type: 3}
-  wallCornerSW: {fileID: 5708497012273527486, guid: 198f4ca7385b4334c9f56305fc74bd73, type: 3}
-  wallTNoNorth: {fileID: 3785872332491605197, guid: 9129fa0d7233b9344b97ed18581f991e, type: 3}
-  wallTNoEast: {fileID: 3627551605753015394, guid: 92beac94dcc9ffc42853d08c721b4353, type: 3}
-  wallTNoSouth: {fileID: 2133431085316642483, guid: 14ef590511f8a354a858f124e605266a, type: 3}
-  wallTNoWest: {fileID: 2009874079616053665, guid: a51e47d6b5bc35d4baf1b63d3e7d053b, type: 3}
-  wallCross: {fileID: 7494786520926040186, guid: 456bc5bdd701cfc4a89b7e54866e87b4, type: 3}
-  wallEndNorth: {fileID: 3489676987736835303, guid: d01b3b4d319a8624ca4606bcff2af7a6, type: 3}
-  wallEndEast: {fileID: 386721488468881891, guid: d8be7ef6547ab8147bab4d259622a444, type: 3}
-  wallEndSouth: {fileID: 1127867725717629266, guid: 0d0ff11931cbd7e4fa51c501f62ec3db, type: 3}
-  wallEndWest: {fileID: 1926768910399187485, guid: 892b0bde0d628a840b7942e32ad223ae, type: 3}
 --- !u!114 &1069331093
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1770,7 +1754,7 @@ MonoBehaviour:
   minLeafSize: 6
   minRoomSize: 3
   maxRoomSize: 10
-  roomShape: 2
+  roomShape: 3
   pillarChance: 0.14
   unionWeight: 0.5
   ellipseWeight: 0.25
@@ -1781,7 +1765,7 @@ MonoBehaviour:
   minExtraEdges: 5
   maxExtraEdges: 10
   gizmoCellSize: 4
-  drawGizmosInEditor: 1
+  drawGizmosInEditor: 0
 --- !u!1 &1117000252
 GameObject:
   m_ObjectHideFlags: 0
@@ -2440,7 +2424,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 526.33496, y: -314.24777}
+  m_AnchoredPosition: {x: 526.33496, y: -369.18112}
   m_SizeDelta: {x: 811.578, y: 69.243}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1769617953
@@ -3138,6 +3122,14 @@ PrefabInstance:
     - target: {fileID: 2219365958370844172, guid: 1cae1e42de5ded94ab5e1c794e0fa977, type: 3}
       propertyPath: m_Name
       value: HealthPotion
+      objectReference: {fileID: 0}
+    - target: {fileID: 5812427107104058895, guid: 1cae1e42de5ded94ab5e1c794e0fa977, type: 3}
+      propertyPath: start.x
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 5812427107104058895, guid: 1cae1e42de5ded94ab5e1c794e0fa977, type: 3}
+      propertyPath: start.y
+      value: 4
       objectReference: {fileID: 0}
     - target: {fileID: 5812427107104058895, guid: 1cae1e42de5ded94ab5e1c794e0fa977, type: 3}
       propertyPath: gameManager

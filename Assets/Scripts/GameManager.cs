@@ -1,5 +1,9 @@
 using UnityEngine;
 
+// Point d'entrée de la partie : construit la grille (via BspDungeonGenerator), positionne
+// joueur/ennemis, instancie le terrain, puis démarre le TurnManager.
+// S'exécute après les scripts par défaut (DefaultExecutionOrder 100) pour garantir que la
+// grille existe déjà quand les Start() des autres scripts (joueur, ennemis) s'exécutent.
 [DefaultExecutionOrder(100)]
 public class GameManager : MonoBehaviour
 {
@@ -14,8 +18,10 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private TurnManager turnManager;
  
+    // Case de départ du joueur, en coordonnées grille (x, z).
+    // Recalculée automatiquement dans AssignStartPositionsFromGrid() au lancement.
     [SerializeField]
-    private int[] start = new int[3] { 1, 1, 0 }; // ligne, colonne, étage
+    private Vector2Int start = new Vector2Int(1, 1);
  
     [SerializeField]
     private float step = 5f;
@@ -23,33 +29,16 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private GameObject terrain;
  
-    [Header("Ground")]
+    [Header("Floor")]
+    [Tooltip("Prefab de sol unique (composant FloorTile) : ses murs/coins/pilier sont activés au cas par cas par GridGenerator.")]
     [SerializeField]
-    private GameObject groundModel;
+    private GameObject floorPrefab;
 
     [Header("Spawning")]
     [Tooltip("Minimum allowed distance (in grid cells) between player and enemies.")]
     [SerializeField]
     private int minEnemyDistance = 5;
- 
-    [Header("Wall Variants")]
-    [SerializeField] private GameObject wallPillar;
-    [SerializeField] private GameObject wallStraightNS;
-    [SerializeField] private GameObject wallStraightEW;
-    [SerializeField] private GameObject wallCornerNE;
-    [SerializeField] private GameObject wallCornerNW;
-    [SerializeField] private GameObject wallCornerSE;
-    [SerializeField] private GameObject wallCornerSW;
-    [SerializeField] private GameObject wallTNoNorth;
-    [SerializeField] private GameObject wallTNoEast;
-    [SerializeField] private GameObject wallTNoSouth;
-    [SerializeField] private GameObject wallTNoWest;
-    [SerializeField] private GameObject wallCross;
-    [SerializeField] private GameObject wallEndNorth;
-    [SerializeField] private GameObject wallEndEast;
-    [SerializeField] private GameObject wallEndSouth;
-    [SerializeField] private GameObject wallEndWest;
- 
+
     private Case[][] gridDefinition;
  
     // ──────────────────────────────────────────
@@ -71,9 +60,9 @@ public class GameManager : MonoBehaviour
             return;
         }
  
-        if (groundModel == null)
+        if (floorPrefab == null)
         {
-            Debug.LogError("Ground model is missing on GameManager.");
+            Debug.LogError("Floor prefab is missing on GameManager.");
             return;
         }
 
@@ -130,8 +119,7 @@ public class GameManager : MonoBehaviour
         int centerX = gridDefinition.Length / 2;
         int centerZ = gridDefinition[0].Length / 2;
         Vector2Int playerCell = FindNearestGround(centerX, centerZ, groundCells);
-        start[0] = playerCell.x;
-        start[1] = playerCell.y;
+        start = playerCell;
 
         // Assign enemies to random distinct ground cells (unique, not overlapping player)
         EnemyController[] enemies = Object.FindObjectsByType<EnemyController>(FindObjectsSortMode.None);
@@ -210,86 +198,22 @@ public class GameManager : MonoBehaviour
     // ──────────────────────────────────────────
  
     // Génère la définition de la grille (appelé dans Awake).
+    // Note : Awake() garantit toujours qu'un BspDungeonGenerator existe avant cet appel
+    // (assigné depuis la scène ou créé automatiquement), donc la génération procédurale
+    // est le seul chemin réellement utilisé ici.
     public void GenerateGridDefinition()
     {
         if (gridDefinition != null) return;
 
-        // If a BSP generator is provided, use its procedurally generated grid.
-        if (bspGenerator != null)
+        if (bspGenerator == null)
         {
-            // Force generation (safe even if bspGenerator already ran in Awake)
-            bspGenerator.GenerateDungeon();
-            gridDefinition = bspGenerator.GetDungeonGrid();
-            ValidateStartPosition();
+            Debug.LogError("[GameManager] Aucun BspDungeonGenerator disponible : impossible de générer la grille.");
             return;
         }
- 
-        Case g = new Case(CellType.Ground);
-        Case w = new Case(CellType.Wall);
- 
-        // gridDefinition = new Case[9][]
-        // {
-        //     new Case[5] { w, w, g, w, w },
-        //     new Case[5] { w, g, g, g, w },
-        //     new Case[5] { w, g, w, g, w },
-        //     new Case[5] { w, g, g, g, w },
-        //     new Case[5] { w, w, g, w, w },
-        //     new Case[5] { w, w, g, g, w },
-        //     new Case[5] { w, g, w, g, w },
-        //     new Case[5] { w, g, g, g, w },
-        //     new Case[5] { w, w, w, w, w }
-        // };
 
-        //    0  1  2  3  4  5  6  7  8  9 10 11 12 13 14
-        //  0 W  W  W  W  W  W  W  W  W  W  W  W  W  W  W
-        //  1 W  G  G  G  W  W  W  G  G  G  W  W  W  W  W
-        //  2 W  G  W  G  W  W  W  G  W  G  W  W  W  W  W
-        //  3 W  G  G  G  G  G  G  G  G  G  W  W  W  W  W
-        //  4 W  W  W  G  W  W  W  W  W  G  W  G  G  G  W
-        //  5 W  W  W  G  W  G  G  G  W  G  G  G  W  G  W
-        //  6 W  W  W  G  G  G  W  G  W  W  W  G  W  G  W
-        //  7 W  W  W  W  W  G  W  G  G  G  G  G  G  G  W
-        //  8 W  G  G  G  W  G  W  W  W  W  W  G  W  W  W
-        //  9 W  G  W  G  W  G  G  G  W  W  W  G  G  G  W
-        // 10 W  G  G  G  G  G  W  G  W  G  G  G  W  G  W
-        // 11 W  W  W  W  W  G  W  G  W  G  W  W  W  G  W
-        // 12 W  W  W  W  W  G  G  G  W  G  G  G  G  G  W
-        // 13 W  W  W  W  W  W  W  W  W  W  W  W  W  W  W
-
-        gridDefinition = new Case[15][]
-        {
-            // col 0  — bord ouest
-            new Case[14] { w, w, w, w, w, w, w, w, w, w, w, w, w, w },
-            // col 1  — salle A (nord-ouest)
-            new Case[14] { w, g, g, g, w, w, w, w, g, g, w, w, w, w },
-            // col 2
-            new Case[14] { w, g, w, g, w, w, w, w, g, g, w, w, w, w },
-            // col 3  — couloir horizontal + salle A
-            new Case[14] { w, g, g, g, g, g, g, w, g, g, w, w, w, w },
-            // col 4  — jonction couloirs
-            new Case[14] { w, w, w, g, w, g, w, w, w, g, w, w, w, w },
-            // col 5  — couloir vertical central
-            new Case[14] { w, w, w, g, w, g, g, g, g, g, g, g, g, w },
-            // col 6  — salle centrale
-            new Case[14] { w, w, w, g, g, g, w, w, w, w, w, g, g, w },
-            // col 7  — salle centrale
-            new Case[14] { w, w, w, w, w, g, w, g, g, g, g, g, g, w },
-            // col 8  — couloir est + salle B
-            new Case[14] { w, g, g, g, w, g, w, w, w, w, w, g, w, w },
-            // col 9  — salle nord-est
-            new Case[14] { w, g, g, g, g, g, g, g, w, w, w, g, g, w },
-            // col 10 — salle nord-est + salle sud-est
-            new Case[14] { w, w, w, w, w, w, w, g, w, g, g, g, g, w },
-            // col 11 — couloir sud
-            new Case[14] { w, w, w, w, w, g, g, g, g, g, w, w, g, w },
-            // col 12 — salle sud-est
-            new Case[14] { w, w, w, w, w, w, g, g, w, g, w, g, g, w },
-            // col 13 — salle sud-est
-            new Case[14] { w, w, w, w, w, w, w, g, w, g, g, g, g, w },
-            // col 14 — bord est
-            new Case[14] { w, w, w, w, w, w, w, w, w, w, w, w, w, w },
-        };
- 
+        // Force la génération (sans danger si bspGenerator a déjà tourné dans son propre Awake)
+        bspGenerator.GenerateDungeon();
+        gridDefinition = bspGenerator.GetDungeonGrid();
         ValidateStartPosition();
     }
  
@@ -308,8 +232,8 @@ public class GameManager : MonoBehaviour
     {
         if (gridDefinition == null) return;
  
-        int row = start[0];
-        int col = start[1];
+        int row = start.x;
+        int col = start.y;
  
         bool rowValid = row >= 0 && row < gridDefinition.Length;
         bool colValid = rowValid && col >= 0 && col < gridDefinition[row].Length;
@@ -317,8 +241,7 @@ public class GameManager : MonoBehaviour
         if (!rowValid || !colValid)
         {
             Debug.LogError($"[GameManager] La position de départ ({row},{col}) est hors des limites de la grille ({gridDefinition.Length}x{gridDefinition[0].Length}). Remise à (1,1).");
-            start[0] = 1;
-            start[1] = 1;
+            start = new Vector2Int(1, 1);
             return;
         }
  
@@ -332,56 +255,8 @@ public class GameManager : MonoBehaviour
     // Accesseurs publics
     // ──────────────────────────────────────────
  
-    public int[] GetStart() => start;
+    public Vector2Int GetStart() => start;
     public float GetStep() => step;
     public GameObject GetTerrain() => terrain;
- 
-    public WallModels GetModels()
-    {
-        return new WallModels
-        {
-            ground     = groundModel,
-            pillar     = wallPillar,
-            straightNS = wallStraightNS,
-            straightEW = wallStraightEW,
-            cornerNE   = wallCornerNE,
-            cornerNW   = wallCornerNW,
-            cornerSE   = wallCornerSE,
-            cornerSW   = wallCornerSW,
-            tNoNorth   = wallTNoNorth,
-            tNoEast    = wallTNoEast,
-            tNoSouth   = wallTNoSouth,
-            tNoWest    = wallTNoWest,
-            cross      = wallCross,
-            endNorth   = wallEndNorth,
-            endEast    = wallEndEast,
-            endSouth   = wallEndSouth,
-            endWest    = wallEndWest
-        };
-    }
-}
- 
-// ──────────────────────────────────────────
-// Struct de données pour les modèles de murs
-// (déplacé dans son propre fichier idéalement, mais gardé ici pour la simplicité)
-// ──────────────────────────────────────────
-public class WallModels
-{
-    public GameObject ground;
-    public GameObject pillar;
-    public GameObject straightNS;
-    public GameObject straightEW;
-    public GameObject cornerNE;
-    public GameObject cornerNW;
-    public GameObject cornerSE;
-    public GameObject cornerSW;
-    public GameObject tNoNorth;
-    public GameObject tNoEast;
-    public GameObject tNoSouth;
-    public GameObject tNoWest;
-    public GameObject cross;
-    public GameObject endNorth;
-    public GameObject endEast;
-    public GameObject endSouth;
-    public GameObject endWest;
+    public GameObject GetFloorPrefab() => floorPrefab;
 }

@@ -33,30 +33,30 @@ public class AudioManager : MonoBehaviour
         return go.AddComponent<AudioManager>();
     }
 
-    [Header("🎵 MUSIQUES")]
+    [Header("Musiques")]
     [SerializeField] private AudioClip musicExploration;   // Boucle pendant l'exploration
     [SerializeField] private AudioClip musicCombat;        // Déclenche lors du combat
     [SerializeField] private AudioClip musicAccueil;       // Écran titre (sera géré par MenuManager)
     [SerializeField] private AudioClip musicCredits;       // Écran crédits (sera géré par CreditsManager)
 
-    [Header("🔊 EFFETS SONORES - Joueur")]
+    [Header("Effets sonores - Joueur")]
     [SerializeField] private AudioClip sfxPlayerHit;       // Joueur prend un coup
     [SerializeField] private AudioClip sfxPlayerDeath;     // Mort du joueur
 
-    [Header("🔊 EFFETS SONORES - Ennemis")]
+    [Header("Effets sonores - Ennemis")]
     [SerializeField] private AudioClip sfxEnemyDamage;     // Ennemi subit des dégâts
     [SerializeField] private AudioClip sfxEnemyDeath;      // Ennemi meurt
 
-    [Header("🔊 EFFETS SONORES - Actions")]
+    [Header("Effets sonores - Actions")]
     [SerializeField] private AudioClip sfxAttack;          // Attaque (joueur ou ennemi)
     [SerializeField] private AudioClip sfxWallBump;        // Collision avec un mur/obstacle
     [SerializeField] private AudioClip[] sfxFootsteps;     // Tableau de bruits de pas (variation sonore)
 
-    [Header("🔊 EFFETS SONORES - Inventaire")]
+    [Header("Effets sonores - Inventaire")]
     [SerializeField] private AudioClip sfxPickupItem;      // Son quand on prend un objet
     [SerializeField] private AudioClip sfxDropItem;        // Son quand on dépose un objet
 
-    [Header("🎚️ CONTRÔLES VOLUME")]
+    [Header("Contrôles de volume")]
     [SerializeField] private float musicVolume = 0.7f;     // Volume des musiques (0 à 1)
     [SerializeField] private float sfxVolume = 1f;         // Volume des effets (0 à 1)
     [SerializeField] private float musicFadeDuration = 0.5f; // Durée du transition entre musiques
@@ -92,15 +92,13 @@ public class AudioManager : MonoBehaviour
         musicSource = gameObject.AddComponent<AudioSource>();
         musicSource.loop = true;           // Les musiques boucles en continu
         musicSource.volume = musicVolume;
-        musicSource.outputAudioMixerGroup = null; // Adapter si vous utilisez un mixer
 
         // AudioSource 2 : Effets sonores (pas de loop, peuvent se chevaucher)
         sfxSource = gameObject.AddComponent<AudioSource>();
         sfxSource.loop = false;            // Les SFX ne jouent qu'une fois
         sfxSource.volume = sfxVolume;
-        sfxSource.outputAudioMixerGroup = null; // Adapter si vous utilisez un mixer
 
-        Debug.Log("[AudioManager] ✓ Singleton initialisé et prêt");
+        Debug.Log("[AudioManager] Singleton initialisé et prêt.");
     }
 
     private void Start()
@@ -188,7 +186,7 @@ public class AudioManager : MonoBehaviour
         musicSource.Play();
         currentMusic = newMusic;
         
-        Debug.Log($"[AudioManager] 🎵 Musique changée : {contextName}");
+        Debug.Log($"[AudioManager] Musique changée : {contextName}");
 
         // === FADE IN (augmentation du volume) ===
         elapsed = 0f;

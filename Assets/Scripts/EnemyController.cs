@@ -43,7 +43,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     [Header("Animation")]
     [SerializeField] private float moveDuration = 0.3f;
-    [SerializeField] private float rotationDuration = 0.2f;
 
     // ──────────────────────────────────────────
     // État interne
@@ -77,7 +76,7 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
         healthSystem?.Initialize(data.maxHealth);
 
-        // ========== INTÉGRATION AUDIO ENNEMI ==========
+        // ── Intégration audio ──
         // S'abonner aux événements de santé de cet ennemi
         // Permet de jouer les sons d'impact et de mort automatiquement
         if (healthSystem != null)
@@ -95,10 +94,12 @@ public class EnemyController : MonoBehaviour, ITurnActor
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlayEnemyDeath();
 
-                // ========== VÉRIFICATION MUSIQUE À LA MORT ==========
-                // Si cet ennemi était en état de combat, vérifier s'il y a d'autres ennemis
-                // Si aucun ennemi n'est plus en chasse/attaque, revenir à l'exploration
-                if (AudioManager.Instance != null && currentState == EnemyState.Chase || currentState == EnemyState.Attack)
+                // Si cet ennemi était en combat (Chase/Attack) au moment de sa mort,
+                // revenir à la musique d'exploration.
+                // Note : les parenthèses sont importantes ici, sans elles le && se lie avant
+                // le ||, ce qui pouvait appeler AudioManager.Instance alors qu'il était null.
+                bool wasInCombat = currentState == EnemyState.Chase || currentState == EnemyState.Attack;
+                if (AudioManager.Instance != null && wasInCombat)
                 {
                     AudioManager.Instance.PlayMusicExploration();
                 }
@@ -196,7 +197,7 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
         Debug.Log($"[{data.enemyName}] État : {currentState} | Distance joueur : {GridDistance(gridPosition, playerGrid)}");
 
-        // ========== TRANSITION MUSICALE ==========
+        // ── Transition musicale ──
         // Quand l'ennemi détecte le joueur → musique de combat
         // Quand l'ennemi perd le joueur → retour à l'exploration
         if (currentState == EnemyState.Chase || currentState == EnemyState.Attack)
@@ -245,7 +246,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     private IEnumerator DoAttack(Vector2Int playerGrid)
     {
-        // ========== SON D'ATTAQUE ==========
         // Jouer un son d'attaque avant le bump visuel
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayAttack();
@@ -441,20 +441,9 @@ public class EnemyController : MonoBehaviour, ITurnActor
     // Utilitaires de coordonnées
     // ──────────────────────────────────────────
 
-    private Vector2Int WorldToGrid(Vector3 worldPos)
-    {
-        float step = gameManager.GetStep();
-        return new Vector2Int(
-            Mathf.RoundToInt(worldPos.x / step),
-            Mathf.RoundToInt(worldPos.z / step)
-        );
-    }
+    private Vector2Int WorldToGrid(Vector3 worldPos) => GridUtils.WorldToGrid(worldPos, gameManager.GetStep());
 
-    private Vector3 GridToWorld(Vector2Int gridPos)
-    {
-        float step = gameManager.GetStep();
-        return new Vector3(gridPos.x * step, 0f, gridPos.y * step);
-    }
+    private Vector3 GridToWorld(Vector2Int gridPos) => GridUtils.GridToWorld(gridPos, gameManager.GetStep());
 
     private void SnapToGrid()
     {

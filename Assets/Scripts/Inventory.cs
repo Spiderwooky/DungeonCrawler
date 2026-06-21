@@ -72,15 +72,6 @@ public class Inventory : MonoBehaviour
             Configure(5, 16);
     }
 
-    public bool TryCollectAt(Vector2Int grid)
-    {
-        if (PickupManager.Instance == null) return false;
-        if (!PickupManager.Instance.TryCollectAt(grid, this)) return false;
-
-        AudioManager.EnsureInstance()?.PlayPickupItem();
-        return true;
-    }
-
     private static InventorySlot[] CreateSlots(int count)
     {
         var slots = new InventorySlot[count];
@@ -179,6 +170,10 @@ public class Inventory : MonoBehaviour
         from.amount = tempAmount;
     }
 
+    // Ajoute `amount` exemplaires de `item` (empile sur les stacks existants, puis remplit
+    // les slots vides). Renvoie true seulement si la totalité a pu être ajoutée — un ajout
+    // partiel (inventaire presque plein) renvoie false mais déclenche quand même
+    // OnInventoryChanged, car l'état a bien changé.
     public bool AddItem(ItemData item, int amount = 1)
     {
         if (item == null || amount <= 0) return false;
@@ -189,13 +184,10 @@ public class Inventory : MonoBehaviour
         remaining = TryFillEmpty(InventoryZone.Hotbar, item, remaining);
         remaining = TryFillEmpty(InventoryZone.Backpack, item, remaining);
 
-        if (remaining < amount)
-        {
-            OnInventoryChanged?.Invoke();
-            return remaining == 0;
-        }
+        if (remaining == amount) return false; // rien n'a pu être ajouté
 
-        return false;
+        OnInventoryChanged?.Invoke();
+        return remaining == 0;
     }
 
     private int TryStack(InventoryZone zone, ItemData item, int remaining)
@@ -235,31 +227,20 @@ public class Inventory : MonoBehaviour
         InventorySlot slot = hotbarSlots[hotbarIndex];
         if (slot.IsEmpty) return false;
 
-        Vector2Int grid = WorldToGrid(transform.position);
+        Vector2Int grid = GridUtils.WorldToGrid(transform.position, gameManager.GetStep());
         if (PickupManager.Instance != null && PickupManager.Instance.HasPickupAt(grid))
             return false;
 
         ItemData item = slot.item;
-        int dropAmount = 1;
+        const int dropAmount = 1;
         slot.amount -= dropAmount;
         if (slot.amount <= 0) slot.Clear();
 
-        float step = gameManager.GetStep();
-        Vector3 worldPos = new Vector3(grid.x * step, 0f, grid.y * step);
+        Vector3 worldPos = GridUtils.GridToWorld(grid, gameManager.GetStep());
         WorldPickup.Spawn(item, dropAmount, worldPos);
         OnInventoryChanged?.Invoke();
         return true;
     }
 
     public bool DropSelectedItem() => DropFromHotbar(selectedHotbarIndex);
-
-
-    public Vector2Int WorldToGrid(Vector3 worldPos)
-    {
-        float step = gameManager != null ? gameManager.GetStep() : 5f;
-        return new Vector2Int(
-            Mathf.RoundToInt(worldPos.x / step),
-            Mathf.RoundToInt(worldPos.z / step)
-        );
-    }
 }

@@ -267,12 +267,6 @@ public class BspDungeonGenerator : MonoBehaviour
         }
     }
 
-    private RoomShape PickRandomRoomShape()
-    {
-        var values = new List<RoomShape> { RoomShape.Rectangle, RoomShape.Ellipse, RoomShape.Union };
-        return values[random.Next(values.Count)];
-    }
-
     // Choisit une forme pour une feuille spécifique en tenant compte de la taille de la salle
     private RoomShape PickRandomRoomShapeForLeaf(Leaf leaf, int roomWidth, int roomHeight)
     {
