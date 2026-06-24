@@ -26,6 +26,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     private bool isMoving;
     private bool isRotating;
     private bool isMyTurn; // Vrai seulement quand le TurnManager a donné la main au joueur
+    private bool isDead;   // Mis à true par OnDeath (HealthSystem) : bloque tout mouvement/rotation
  
     // ──────────────────────────────────────────
     // Initialisation
@@ -53,8 +54,10 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
             };
 
             // OnDeath est appelé quand les PV du joueur tombent à 0
-            healthSystem.OnDeath += () => 
+            healthSystem.OnDeath += () =>
             {
+                isDead = true;
+
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlayPlayerDeath();
             };
@@ -134,8 +137,8 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
  
     public void TryMove(Vector3 direction)
     {
-        // Si pas mon tour OU déjà en cours d'animation : on ignore
-        if (!isMyTurn || isMoving || isRotating) return;
+        // Si pas mon tour, déjà en cours d'animation, OU mort : on ignore
+        if (!isMyTurn || isMoving || isRotating || isDead) return;
  
         Vector3 targetPosition = transform.position + direction * gameManager.GetStep();
 
@@ -292,7 +295,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
  
     public void TryRotate(float direction)
     {
-        if (!isMyTurn || isMoving || isRotating) return;
+        if (!isMyTurn || isMoving || isRotating || isDead) return;
  
         float deltaAngle = direction > 0 ? rotationAngle : -rotationAngle;
         StartCoroutine(RotateSmoothly(deltaAngle));

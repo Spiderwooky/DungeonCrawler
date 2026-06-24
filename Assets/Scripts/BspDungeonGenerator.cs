@@ -65,7 +65,20 @@ public class BspDungeonGenerator : MonoBehaviour
     [Tooltip("Nombre maximum de liaisons supplémentaires créées au-delà du MST")]
     public int maxExtraEdges = 5;
 
+    [Header("Salles")]
+    [Tooltip("Nombre minimum d'ennemis pouvant apparaître dans une salle de type Monster.")]
+    public int minEnemiesPerRoom = 1;
+
+    [Tooltip("Nombre maximum d'ennemis pouvant apparaître dans une salle de type Monster.")]
+    public int maxEnemiesPerRoom = 3;
+
+    [Tooltip("Probabilité qu'une salle (hors salle de départ) soit vide de monstres.")]
+    [Range(0f, 1f)]
+    public float emptyRoomChance = 0.15f;
+
     private Case[][] grid;
+    private int[][] roomIds;
+    private List<RoomInfo> rooms;
     private System.Random random;
     private readonly Case wallCase = new Case(CellType.Wall);
     private readonly Case groundCase = new Case(CellType.Ground);
@@ -90,6 +103,26 @@ public class BspDungeonGenerator : MonoBehaviour
             GenerateDungeon();
         }
         return grid;
+    }
+
+    // Identifiant de salle (Leaf.Id) par case, ou -1 pour les couloirs/murs.
+    public int[][] GetRoomIds()
+    {
+        if (roomIds == null)
+        {
+            GenerateDungeon();
+        }
+        return roomIds;
+    }
+
+    // Métadonnées de chaque salle (type, cases, capacité d'ennemis...).
+    public List<RoomInfo> GetRooms()
+    {
+        if (rooms == null)
+        {
+            GenerateDungeon();
+        }
+        return rooms;
     }
 
     [Header("Gizmos")]
@@ -148,19 +181,86 @@ public class BspDungeonGenerator : MonoBehaviour
         CreateRooms(leaves);
         CarveRooms(leaves);
         ConnectRooms(leaves);
+        BuildRoomInfos(leaves);
     }
 
     private void InitializeGrid()
     {
         grid = new Case[width][];
+        roomIds = new int[width][];
         for (int x = 0; x < width; x++)
         {
             grid[x] = new Case[height];
+            roomIds[x] = new int[height];
             for (int z = 0; z < height; z++)
             {
                 grid[x][z] = wallCase;
+                roomIds[x][z] = -1;
             }
         }
+    }
+
+    // Construit les RoomInfo (type, cases, capacité) pour chaque salle carvée.
+    // La salle dont le centre est le plus proche du centre de la grille devient la salle
+    // de départ (Start) ; les autres sont Monster, avec une chance d'être vides (Empty).
+    private void BuildRoomInfos(List<Leaf> leaves)
+    {
+        var cellsByRoomId = new Dictionary<int, List<Vector2Int>>();
+        for (int x = 0; x < width; x++)
+        {
+            for (int z = 0; z < height; z++)
+            {
+                int id = roomIds[x][z];
+                if (id < 0) continue;
+
+                if (!cellsByRoomId.TryGetValue(id, out List<Vector2Int> cells))
+                {
+                    cells = new List<Vector2Int>();
+                    cellsByRoomId[id] = cells;
+                }
+                cells.Add(new Vector2Int(x, z));
+            }
+        }
+
+        Leaf startLeaf = FindStartLeaf(leaves);
+
+        rooms = new List<RoomInfo>();
+        foreach (Leaf leaf in leaves)
+        {
+            if (!leaf.room.HasValue) continue;
+            if (!cellsByRoomId.TryGetValue(leaf.Id, out List<Vector2Int> roomCells) || roomCells.Count == 0) continue;
+
+            RoomType type = leaf == startLeaf
+                ? RoomType.Start
+                : (random.NextDouble() < emptyRoomChance ? RoomType.Empty : RoomType.Monster);
+
+            int maxEnemies = type == RoomType.Monster
+                ? random.Next(minEnemiesPerRoom, maxEnemiesPerRoom + 1)
+                : 0;
+
+            rooms.Add(new RoomInfo(leaf.Id, type, roomCells, leaf.room.Value, maxEnemies));
+        }
+    }
+
+    private Leaf FindStartLeaf(List<Leaf> leaves)
+    {
+        Leaf best = null;
+        float bestDistance = float.MaxValue;
+        Vector2 gridCenter = new Vector2(width / 2f, height / 2f);
+
+        foreach (Leaf leaf in leaves)
+        {
+            if (!leaf.room.HasValue) continue;
+
+            float distance = Vector2.Distance(leaf.room.Value.center, gridCenter);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = leaf;
+            }
+        }
+
+        return best;
     }
 
     private List<Leaf> SplitLeaves(Leaf root)
@@ -197,8 +297,11 @@ public class BspDungeonGenerator : MonoBehaviour
 
     private void CreateRooms(List<Leaf> leaves)
     {
+        int nextRoomId = 0;
         foreach (Leaf leaf in leaves)
         {
+            leaf.Id = nextRoomId++;
+
             // Déterminer des limites sûres pour la taille des salles à l'intérieur de la feuille
             int maxAvailableWidth = Mathf.Max(1, leaf.width - 2); // laisser 1 case de bordure de chaque côté
             int maxAvailableHeight = Mathf.Max(1, leaf.height - 2);
@@ -532,11 +635,11 @@ public class BspDungeonGenerator : MonoBehaviour
             }
             else if (leaf.roomShape == RoomShape.Ellipse)
             {
-                CarveEllipseRoom(leaf.roomA.Value);
+                CarveEllipseRoom(leaf.roomA.Value, leaf.Id);
             }
             else
             {
-                CarveRectangleRoom(leaf.roomA.Value);
+                CarveRectangleRoom(leaf.roomA.Value, leaf.Id);
             }
 
             if (pillarChance > 0f)
@@ -546,25 +649,26 @@ public class BspDungeonGenerator : MonoBehaviour
         }
     }
 
-    private void CarveRectangleRoom(RectInt room)
+    private void CarveRectangleRoom(RectInt room, int roomId)
     {
         for (int x = room.xMin; x < room.xMax; x++)
         {
             for (int z = room.yMin; z < room.yMax; z++)
             {
                 grid[x][z] = groundCase;
+                roomIds[x][z] = roomId;
             }
         }
     }
 
     private void CarveUnionRoom(Leaf leaf)
     {
-        CarveRectangleRoom(leaf.roomA.Value);
-        CarveRectangleRoom(leaf.roomB.Value);
+        CarveRectangleRoom(leaf.roomA.Value, leaf.Id);
+        CarveRectangleRoom(leaf.roomB.Value, leaf.Id);
 
         Vector2Int connectorA = GetConnectorPoint(leaf.roomA.Value, leaf.roomB.Value);
         Vector2Int connectorB = GetConnectorPoint(leaf.roomB.Value, leaf.roomA.Value);
-        CarveStraightCorridor(connectorA, connectorB);
+        CarveStraightCorridor(connectorA, connectorB, leaf.Id);
     }
 
     private Vector2Int GetConnectorPoint(RectInt from, RectInt to)
@@ -574,25 +678,28 @@ public class BspDungeonGenerator : MonoBehaviour
         return new Vector2Int(x, z);
     }
 
-    private void CarveStraightCorridor(Vector2Int start, Vector2Int goal)
+    private void CarveStraightCorridor(Vector2Int start, Vector2Int goal, int roomId)
     {
         Vector2Int pos = start;
         grid[pos.x][pos.y] = groundCase;
+        roomIds[pos.x][pos.y] = roomId;
 
         while (pos.x != goal.x)
         {
             pos.x += (goal.x > pos.x) ? 1 : -1;
             grid[pos.x][pos.y] = groundCase;
+            roomIds[pos.x][pos.y] = roomId;
         }
 
         while (pos.y != goal.y)
         {
             pos.y += (goal.y > pos.y) ? 1 : -1;
             grid[pos.x][pos.y] = groundCase;
+            roomIds[pos.x][pos.y] = roomId;
         }
     }
 
-    private void CarveEllipseRoom(RectInt room)
+    private void CarveEllipseRoom(RectInt room, int roomId)
     {
         Vector2 center = new Vector2((room.xMin + room.xMax - 1) / 2f, (room.yMin + room.yMax - 1) / 2f);
         float radiusX = room.width / 2f;
@@ -608,6 +715,7 @@ public class BspDungeonGenerator : MonoBehaviour
                 if (normalizedX * normalizedX + normalizedZ * normalizedZ <= radiusLimit)
                 {
                     grid[x][z] = groundCase;
+                    roomIds[x][z] = roomId;
                 }
             }
         }
@@ -646,6 +754,7 @@ public class BspDungeonGenerator : MonoBehaviour
                     if (surroundedByGround)
                     {
                         grid[x][z] = wallCase;
+                        roomIds[x][z] = -1;
                     }
                 }
             }
@@ -676,6 +785,7 @@ public class BspDungeonGenerator : MonoBehaviour
         public int z;
         public int width;
         public int height;
+        public int Id = -1;
         public Leaf Left;
         public Leaf Right;
         public RectInt? room;

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using TMPro;
 
 /// <summary>
 /// UI d'inventaire : slots générés depuis un prefab selon les compteurs Inspector.
@@ -11,7 +12,7 @@ public class InventoryUI : MonoBehaviour
     [Header("Références")]
     [SerializeField] private Inventory inventory;
     [SerializeField] private GameObject inventoryPanel;
-    [SerializeField] private Text hintText;
+    [SerializeField] private TextMeshProUGUI hintText;
 
     [Header("Nombre de slots (Inspector)")]
     [SerializeField] private int hotbarSlotCount = 5;

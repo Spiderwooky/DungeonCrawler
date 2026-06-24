@@ -17,9 +17,13 @@ public class GameManager : MonoBehaviour
 
     [SerializeField]
     private TurnManager turnManager;
- 
+
+    [Tooltip("Gère la population des salles en ennemis (population initiale + repop).")]
+    [SerializeField]
+    private RoomManager roomManager;
+
     // Case de départ du joueur, en coordonnées grille (x, z).
-    // Recalculée automatiquement dans AssignStartPositionsFromGrid() au lancement.
+    // Recalculée automatiquement dans AssignStartPositionFromStartRoom() au lancement.
     [SerializeField]
     private Vector2Int start = new Vector2Int(1, 1);
  
@@ -33,11 +37,6 @@ public class GameManager : MonoBehaviour
     [Tooltip("Prefab de sol unique (composant FloorTile) : ses murs/coins/pilier sont activés au cas par cas par GridGenerator.")]
     [SerializeField]
     private GameObject floorPrefab;
-
-    [Header("Spawning")]
-    [Tooltip("Minimum allowed distance (in grid cells) between player and enemies.")]
-    [SerializeField]
-    private int minEnemyDistance = 5;
 
     private Case[][] gridDefinition;
  
@@ -87,79 +86,38 @@ public class GameManager : MonoBehaviour
         }
  
         GenerateGridDefinition();
-        // Ensure player and enemies have coherent start positions based on the generated grid
-        AssignStartPositionsFromGrid();
+        // Le joueur démarre dans la salle de départ (jamais de monstres ni d'objets).
+        AssignStartPositionFromStartRoom();
+
+        if (roomManager != null)
+        {
+            roomManager.InitializeRooms(bspGenerator.GetRoomIds(), bspGenerator.GetRooms(), start);
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] RoomManager non assigné : les salles ne seront pas peuplées d'ennemis.");
+        }
 
         gridGenerator.GenerateGridAndTerrain(this);
     }
 
-    // Assign player start and enemy starts/patrol centers based on available ground cells
-    private void AssignStartPositionsFromGrid()
+    // Place le point de départ du joueur dans la salle taguée RoomType.Start par le générateur.
+    private void AssignStartPositionFromStartRoom()
     {
         if (gridDefinition == null) return;
 
-        // Collect all ground cells
-        var groundCells = new System.Collections.Generic.List<Vector2Int>();
-        for (int x = 0; x < gridDefinition.Length; x++)
-        {
-            for (int z = 0; z < gridDefinition[x].Length; z++)
-            {
-                if (gridDefinition[x][z] != null && gridDefinition[x][z].IsGround())
-                    groundCells.Add(new Vector2Int(x, z));
-            }
-        }
+        System.Collections.Generic.List<RoomInfo> rooms = bspGenerator.GetRooms();
+        RoomInfo startRoom = rooms.Find(room => room.Type == RoomType.Start);
 
-        if (groundCells.Count == 0)
+        if (startRoom == null || startRoom.Cells.Count == 0)
         {
-            Debug.LogWarning("[GameManager] No ground cells found to place player/enemies.");
+            Debug.LogWarning("[GameManager] Aucune salle de départ trouvée : le joueur démarre en (1,1).");
+            start = new Vector2Int(1, 1);
             return;
         }
 
-        // Choose player start near the center of the grid if possible
-        int centerX = gridDefinition.Length / 2;
-        int centerZ = gridDefinition[0].Length / 2;
-        Vector2Int playerCell = FindNearestGround(centerX, centerZ, groundCells);
-        start = playerCell;
-
-        // Assign enemies to random distinct ground cells (unique, not overlapping player)
-        EnemyController[] enemies = Object.FindObjectsByType<EnemyController>(FindObjectsSortMode.None);
-        var rnd = new System.Random();
-        var usedCells = new System.Collections.Generic.HashSet<Vector2Int>();
-        usedCells.Add(playerCell);
-
-        foreach (var enemy in enemies)
-        {
-            Vector2Int chosen = playerCell;
-
-            // Build list of candidates that are unused and satisfy minimum distance from player
-            var validCandidates = new System.Collections.Generic.List<Vector2Int>();
-            foreach (var c in groundCells)
-            {
-                if (usedCells.Contains(c)) continue;
-                if (Vector2Int.Distance(c, playerCell) >= minEnemyDistance)
-                {
-                    validCandidates.Add(c);
-                }
-            }
-
-            if (validCandidates.Count > 0)
-            {
-                chosen = validCandidates[rnd.Next(validCandidates.Count)];
-            }
-            else
-            {
-                // Fallback: pick any unused ground cell if no candidate meets the distance
-                var unused = new System.Collections.Generic.List<Vector2Int>();
-                foreach (var c in groundCells) if (!usedCells.Contains(c)) unused.Add(c);
-                if (unused.Count > 0)
-                {
-                    chosen = unused[rnd.Next(unused.Count)];
-                }
-            }
-
-            usedCells.Add(chosen);
-            enemy.SetStartAndPatrol(chosen, chosen);
-        }
+        Vector2 center = startRoom.Bounds.center;
+        start = FindNearestGround(Mathf.RoundToInt(center.x), Mathf.RoundToInt(center.y), startRoom.Cells);
     }
 
     private Vector2Int FindNearestGround(int x, int z, System.Collections.Generic.List<Vector2Int> groundCells)

@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using TMPro;
 
 /// <summary>
 /// Un slot d'UI (hotbar ou sac) : clic, drag & drop.
@@ -10,8 +11,8 @@ public class InventorySlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, I
 {
     [SerializeField] private Image background;
     [SerializeField] private Image icon;
-    [SerializeField] private Text amountText;
-    [SerializeField] private Text keyLabel;
+    [SerializeField] private TextMeshProUGUI amountText;
+    [SerializeField] private TextMeshProUGUI keyLabel;
     [SerializeField] private Image pickHighlight;
     [SerializeField] private Image selectionHighlight;
 

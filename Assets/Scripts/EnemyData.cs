@@ -36,4 +36,8 @@ public class EnemyData : ScriptableObject
 
     [Tooltip("Rayon en nombre de cases à partir duquel l'ennemi peut attaquer.")]
     [Min(1)] public int attackRadius = 1;
+
+    [Header("Performance")]
+    [Tooltip("Distance (en cases) au-delà de laquelle l'ennemi ignore complètement son tour (pas de calcul d'état, pas d'animation). Évite que les tours deviennent longs quand beaucoup d'ennemis sont présents ; seuls ceux proches du joueur bougent réellement.")]
+    [Min(1)] public int turnActivationDistance = 12;
 }

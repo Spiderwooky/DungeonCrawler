@@ -159,6 +159,15 @@ public class EnemyController : MonoBehaviour, ITurnActor
         patrolCenter = patrolCenterPos;
     }
 
+    // Permet à un gestionnaire externe (RoomManager) de fournir les références de scène
+    // quand l'ennemi est instancié dynamiquement depuis un prefab (qui ne peut pas les
+    // référencer directement, car ce sont des objets de la scène).
+    public void Configure(GameManager manager, Transform player)
+    {
+        gameManager = manager;
+        playerTransform = player;
+    }
+
     // ──────────────────────────────────────────
     // ITurnActor
     // ──────────────────────────────────────────
@@ -170,6 +179,17 @@ public class EnemyController : MonoBehaviour, ITurnActor
             TurnManager.Instance?.EndTurn();
             return;
         }
+
+        // Optimisation : trop loin du joueur pour être visible/pertinent, on ignore
+        // complètement le tour (pas de calcul d'état ni d'animation) plutôt que de payer
+        // le coût d'une coroutine animée pour un ennemi que le joueur ne voit pas.
+        Vector2Int playerGrid = WorldToGrid(playerTransform.position);
+        if (GridDistance(gridPosition, playerGrid) > data.turnActivationDistance)
+        {
+            TurnManager.Instance?.EndTurn();
+            return;
+        }
+
         StartCoroutine(TakeTurn());
     }
 

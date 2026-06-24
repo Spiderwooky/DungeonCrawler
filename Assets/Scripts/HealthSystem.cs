@@ -11,6 +11,9 @@ public class HealthSystem : MonoBehaviour
 {
     [SerializeField] private int maxHealth = 10;
 
+    [Tooltip("Si vrai (par défaut), le GameObject est détruit après la mort (comportement des ennemis). Mettre à false sur le joueur : son GameObject doit rester en vie pour afficher l'écran de mort.")]
+    [SerializeField] private bool destroyOnDeath = true;
+
     // Événements auxquels les autres scripts peuvent s'abonner
     public event Action<int, int> OnDamaged;   // (pvRestants, pvMax)
     public event Action<int, int> OnHealed;    // (pvRestants, pvMax)
@@ -80,7 +83,12 @@ public class HealthSystem : MonoBehaviour
             TurnManager.Instance?.UnregisterEnemy(enemy);
         }
 
-        // Détruire le GameObject après un court délai (laisse le temps aux animations)
-        Destroy(gameObject, 0.5f);
+        // Détruire le GameObject après un court délai (laisse le temps aux animations).
+        // Désactivé pour le joueur (destroyOnDeath = false) : son écran de mort a besoin
+        // que le GameObject reste en vie.
+        if (destroyOnDeath)
+        {
+            Destroy(gameObject, 0.5f);
+        }
     }
 }
