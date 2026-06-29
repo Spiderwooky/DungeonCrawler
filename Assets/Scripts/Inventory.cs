@@ -4,7 +4,8 @@ using UnityEngine;
 public enum InventoryZone
 {
     Hotbar,
-    Backpack
+    Backpack,
+    Equipment
 }
 
 [Serializable]
@@ -38,6 +39,7 @@ public class Inventory : MonoBehaviour
 
     private InventorySlot[] hotbarSlots;
     private InventorySlot[] backpackSlots;
+    private InventorySlot[] equipmentSlots;
 
     private int selectedHotbarIndex;
     private bool hasPick;
@@ -48,18 +50,21 @@ public class Inventory : MonoBehaviour
 
     public int HotbarSlotCount => hotbarSlots?.Length ?? 0;
     public int BackpackSlotCount => backpackSlots?.Length ?? 0;
+    public int EquipmentSlotCount => equipmentSlots?.Length ?? 0;
     public int SelectedHotbarIndex => selectedHotbarIndex;
     public bool HasPick => hasPick;
     public InventoryZone PickedZone => pickedZone;
     public int PickedIndex => pickedIndex;
 
-    public void Configure(int hotbarCount, int backpackCount)
+    public void Configure(int hotbarCount, int backpackCount, int equipmentCount = 1)
     {
         hotbarCount = Mathf.Max(1, hotbarCount);
         backpackCount = Mathf.Max(1, backpackCount);
+        equipmentCount = Mathf.Max(1, equipmentCount);
 
         hotbarSlots = CreateSlots(hotbarCount);
         backpackSlots = CreateSlots(backpackCount);
+        equipmentSlots = CreateSlots(equipmentCount);
         ClearPick();
     }
 
@@ -69,7 +74,7 @@ public class Inventory : MonoBehaviour
             gameManager = FindFirstObjectByType<GameManager>();
 
         if (hotbarSlots == null || backpackSlots == null)
-            Configure(5, 16);
+            Configure(5, 16, 1);
     }
 
     private static InventorySlot[] CreateSlots(int count)
@@ -87,8 +92,15 @@ public class Inventory : MonoBehaviour
         return slots[index];
     }
 
-    public InventorySlot[] GetSlots(InventoryZone zone) =>
-        zone == InventoryZone.Hotbar ? hotbarSlots : backpackSlots;
+    public InventorySlot[] GetSlots(InventoryZone zone)
+    {
+        switch (zone)
+        {
+            case InventoryZone.Hotbar: return hotbarSlots;
+            case InventoryZone.Equipment: return equipmentSlots;
+            default: return backpackSlots;
+        }
+    }
 
     public void SelectHotbar(int index)
     {
@@ -142,6 +154,9 @@ public class Inventory : MonoBehaviour
         InventorySlot from = GetSlot(fromZone, fromIndex);
         InventorySlot to = GetSlot(toZone, toIndex);
         if (from == null || to == null || from.IsEmpty) return;
+
+        // Le slot d'équipement n'accepte que les objets équipables.
+        if (toZone == InventoryZone.Equipment && !(from.item is EquipmentItemData)) return;
 
         if (!to.IsEmpty && to.item == from.item)
         {
@@ -264,13 +279,29 @@ public class Inventory : MonoBehaviour
         return remaining;
     }
 
-    public bool DropFromHotbar(int hotbarIndex)
+    // Détermine quel slot vise une action "rapide" (G pour jeter, F pour utiliser/équiper) :
+    // l'objet actuellement épinglé (cliqué) dans le sac s'il y en a un, sinon le slot hotbar
+    // sélectionné. Permet de jeter/utiliser un objet du sac sans devoir le déplacer en hotbar.
+    private (InventoryZone zone, int index) ResolveActiveSlot()
+    {
+        if (hasPick && pickedZone == InventoryZone.Backpack)
+            return (InventoryZone.Backpack, pickedIndex);
+
+        return (InventoryZone.Hotbar, selectedHotbarIndex);
+    }
+
+    public bool DropSelectedItem()
+    {
+        (InventoryZone zone, int index) = ResolveActiveSlot();
+        return DropFromSlot(zone, index);
+    }
+
+    private bool DropFromSlot(InventoryZone zone, int index)
     {
         if (gameManager == null) return false;
-        if (hotbarIndex < 0 || hotbarIndex >= HotbarSlotCount) return false;
 
-        InventorySlot slot = hotbarSlots[hotbarIndex];
-        if (slot.IsEmpty) return false;
+        InventorySlot slot = GetSlot(zone, index);
+        if (slot == null || slot.IsEmpty) return false;
 
         Vector2Int grid = GridUtils.WorldToGrid(transform.position, gameManager.GetStep());
         if (PickupManager.Instance != null && PickupManager.Instance.HasPickupAt(grid))
@@ -281,11 +312,66 @@ public class Inventory : MonoBehaviour
         slot.amount -= dropAmount;
         if (slot.amount <= 0) slot.Clear();
 
+        if (hasPick && pickedZone == zone && pickedIndex == index)
+            ClearPick();
+
         Vector3 worldPos = GridUtils.GridToWorld(grid, gameManager.GetStep());
         WorldPickup.Spawn(item, dropAmount, worldPos);
         OnInventoryChanged?.Invoke();
         return true;
     }
 
-    public bool DropSelectedItem() => DropFromHotbar(selectedHotbarIndex);
+    // Équipe l'objet équipable situé à (fromZone, fromIndex) : prend le premier slot
+    // d'équipement libre, ou échange avec le premier slot équipé si tous sont occupés.
+    public void Equip(InventoryZone fromZone, int fromIndex)
+    {
+        if (equipmentSlots == null || equipmentSlots.Length == 0) return;
+
+        for (int i = 0; i < equipmentSlots.Length; i++)
+        {
+            if (equipmentSlots[i].IsEmpty)
+            {
+                MoveOrSwap(fromZone, fromIndex, InventoryZone.Equipment, i);
+                return;
+            }
+        }
+
+        MoveOrSwap(fromZone, fromIndex, InventoryZone.Equipment, 0);
+    }
+
+    // Somme des bonus d'attaque de tout ce qui est actuellement équipé.
+    public int GetEquipmentAttackBonus()
+    {
+        if (equipmentSlots == null) return 0;
+
+        int total = 0;
+        foreach (InventorySlot slot in equipmentSlots)
+        {
+            if (!slot.IsEmpty && slot.item is EquipmentItemData equipment)
+                total += equipment.attackBonus;
+        }
+        return total;
+    }
+
+    // Utilise l'objet visé par ResolveActiveSlot (potion → soin + consommation, équipement →
+    // s'équipe). Renvoie false si le slot est vide (rien à utiliser, pas d'action).
+    public bool UseSelectedItem(GameObject user)
+    {
+        (InventoryZone zone, int index) = ResolveActiveSlot();
+        InventorySlot slot = GetSlot(zone, index);
+        if (slot == null || slot.IsEmpty) return false;
+
+        bool consumed = slot.item.OnUse(user, this, zone, index);
+        if (consumed)
+        {
+            slot.amount -= 1;
+            if (slot.amount <= 0) slot.Clear();
+        }
+
+        if (hasPick && pickedZone == zone && pickedIndex == index)
+            ClearPick();
+
+        OnInventoryChanged?.Invoke();
+        return true;
+    }
 }

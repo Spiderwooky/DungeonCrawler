@@ -18,14 +18,19 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] private int hotbarSlotCount = 5;
     [SerializeField] private int backpackSlotCount = 16;
     [SerializeField] private int backpackColumns = 8;
+    [Tooltip("Nombre de slots d'équipement (arme, bouclier, armure, charme...).")]
+    [SerializeField] private int equipmentSlotCount = 1;
 
     [Header("Génération des slots")]
     [SerializeField] private InventorySlotUI slotPrefab;
     [SerializeField] private RectTransform hotbarContainer;
     [SerializeField] private RectTransform backpackContainer;
+    [Tooltip("Optionnel : conteneur des slots d'équipement. Laisser vide si pas encore câblé dans l'UI.")]
+    [SerializeField] private RectTransform equipmentContainer;
 
     private readonly List<InventorySlotUI> hotbarSlots = new List<InventorySlotUI>();
     private readonly List<InventorySlotUI> backpackSlots = new List<InventorySlotUI>();
+    private readonly List<InventorySlotUI> equipmentSlots = new List<InventorySlotUI>();
 
     private bool isOpen;
     private bool isDragging;
@@ -67,6 +72,7 @@ public class InventoryUI : MonoBehaviour
         hotbarSlotCount = Mathf.Max(1, hotbarSlotCount);
         backpackSlotCount = Mathf.Max(1, backpackSlotCount);
         backpackColumns = Mathf.Max(1, backpackColumns);
+        equipmentSlotCount = Mathf.Max(1, equipmentSlotCount);
     }
 
     [ContextMenu("Rebuild Slot UI")]
@@ -81,8 +87,10 @@ public class InventoryUI : MonoBehaviour
     {
         ClearContainer(hotbarContainer);
         ClearContainer(backpackContainer);
+        ClearContainer(equipmentContainer);
         hotbarSlots.Clear();
         backpackSlots.Clear();
+        equipmentSlots.Clear();
 
         GridLayoutGroup grid = backpackContainer.GetComponent<GridLayoutGroup>();
         if (grid != null)
@@ -94,8 +102,14 @@ public class InventoryUI : MonoBehaviour
         for (int i = 0; i < backpackSlotCount; i++)
             backpackSlots.Add(CreateSlot(backpackContainer, InventoryZone.Backpack, i));
 
+        if (equipmentContainer != null)
+        {
+            for (int i = 0; i < equipmentSlotCount; i++)
+                equipmentSlots.Add(CreateSlot(equipmentContainer, InventoryZone.Equipment, i));
+        }
+
         if (inventory != null)
-            inventory.Configure(hotbarSlotCount, backpackSlotCount);
+            inventory.Configure(hotbarSlotCount, backpackSlotCount, equipmentSlotCount);
     }
 
     private InventorySlotUI CreateSlot(Transform parent, InventoryZone zone, int index)
@@ -107,6 +121,8 @@ public class InventoryUI : MonoBehaviour
 
     private void ClearContainer(Transform container)
     {
+        if (container == null) return;
+
         for (int i = container.childCount - 1; i >= 0; i--)
         {
             Transform child = container.GetChild(i);
@@ -159,11 +175,14 @@ public class InventoryUI : MonoBehaviour
         Refresh();
     }
 
+    private bool IsZoneGatedByOpen(InventoryZone zone) =>
+        zone == InventoryZone.Backpack || zone == InventoryZone.Equipment;
+
     public void HandleSlotClick(InventoryZone zone, int index)
     {
         if (inventory == null || isDragging) return;
 
-        if (zone == InventoryZone.Backpack && !isOpen)
+        if (IsZoneGatedByOpen(zone) && !isOpen)
             return;
 
         if (zone == InventoryZone.Hotbar)
@@ -182,7 +201,7 @@ public class InventoryUI : MonoBehaviour
     {
         InventorySlot slot = inventory?.GetSlot(zone, index);
         if (slot == null || slot.IsEmpty) return;
-        if (zone == InventoryZone.Backpack && !isOpen) return;
+        if (IsZoneGatedByOpen(zone) && !isOpen) return;
 
         isDragging = true;
         dragZone = zone;
@@ -258,16 +277,26 @@ public class InventoryUI : MonoBehaviour
         {
             InventorySlotUI slot = result.gameObject.GetComponentInParent<InventorySlotUI>();
             if (slot == null) continue;
-            if (slot.Zone == InventoryZone.Backpack && !isOpen) continue;
+            if (IsZoneGatedByOpen(slot.Zone) && !isOpen) continue;
             return slot;
         }
 
         return null;
     }
 
+    private List<InventorySlotUI> GetSlotList(InventoryZone zone)
+    {
+        switch (zone)
+        {
+            case InventoryZone.Hotbar: return hotbarSlots;
+            case InventoryZone.Equipment: return equipmentSlots;
+            default: return backpackSlots;
+        }
+    }
+
     private InventorySlotUI FindSlotUI(InventoryZone zone, int index)
     {
-        List<InventorySlotUI> list = zone == InventoryZone.Hotbar ? hotbarSlots : backpackSlots;
+        List<InventorySlotUI> list = GetSlotList(zone);
         foreach (InventorySlotUI slot in list)
         {
             if (slot != null && slot.Zone == zone && slot.SlotIndex == index)
@@ -298,6 +327,25 @@ public class InventoryUI : MonoBehaviour
                 hideIcon);
         }
 
+        // Comme la hotbar, le slot d'équipement est affiché en dehors du panel (toujours
+        // visible) : il doit donc se rafraîchir même quand l'inventaire est fermé.
+        for (int i = 0; i < equipmentSlots.Count; i++)
+        {
+            if (equipmentSlots[i] == null) continue;
+
+            bool equipPicked = inventory.HasPick
+                && inventory.PickedZone == InventoryZone.Equipment
+                && inventory.PickedIndex == i;
+            bool hideEquipIcon = isDragging && dragZone == InventoryZone.Equipment && dragIndex == i;
+
+            equipmentSlots[i].Refresh(
+                inventory.GetSlot(InventoryZone.Equipment, i),
+                false,
+                equipPicked,
+                null,
+                hideEquipIcon);
+        }
+
         if (!isOpen) return;
 
         for (int i = 0; i < backpackSlots.Count; i++)
@@ -320,8 +368,8 @@ public class InventoryUI : MonoBehaviour
         if (hintText != null)
         {
             hintText.text = inventory.HasPick
-                ? "Clic ou glisser-déposer  |  G pour jeter (hotbar)  |  I pour fermer"
-                : "Clic / drag & drop  |  G : jeter le slot hotbar actif  |  I : fermer";
+                ? "Clic ou glisser-déposer  |  G pour jeter (hotbar)  |  F pour utiliser/équiper  |  I pour fermer"
+                : "Clic / drag & drop  |  G : jeter le slot hotbar actif  |  F : utiliser/équiper  |  I : fermer";
         }
     }
 }

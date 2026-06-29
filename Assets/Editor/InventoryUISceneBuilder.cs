@@ -115,6 +115,53 @@ public static class InventoryUISceneBuilder
         return EnsureSlotPrefab();
     }
 
+    [MenuItem("J5 Griller/Add Equipment Slots To Inventory UI")]
+    public static void AddEquipmentSlots()
+    {
+        InventoryUI inventoryUI = Object.FindFirstObjectByType<InventoryUI>();
+        if (inventoryUI == null)
+        {
+            Debug.LogError("[InventoryUISceneBuilder] Aucune InventoryUI dans la scène. Lancez d'abord 'Create Inventory UI In Scene'.");
+            return;
+        }
+
+        SerializedObject so = new SerializedObject(inventoryUI);
+        SerializedProperty containerProp = so.FindProperty("equipmentContainer");
+        if (containerProp.objectReferenceValue != null)
+        {
+            if (!EditorUtility.DisplayDialog("Slots d'équipement",
+                "Un conteneur d'équipement est déjà assigné sur cette InventoryUI. Continuer quand même ?", "Oui", "Annuler"))
+                return;
+        }
+
+        SerializedProperty panelProp = so.FindProperty("inventoryPanel");
+        GameObject panelGo = panelProp.objectReferenceValue as GameObject;
+        if (panelGo == null)
+        {
+            Debug.LogError("[InventoryUISceneBuilder] 'Inventory Panel' n'est pas assigné sur InventoryUI.");
+            return;
+        }
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        CreateText(panelGo.transform, font, "Équipement", 18, FontStyle.Bold, 500, 28);
+
+        GameObject grid = CreateRect("EquipmentGrid", panelGo.transform);
+        SetAnchors(grid, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(280, 64), Vector2.zero);
+        GridLayoutGroup gridLayout = grid.AddComponent<GridLayoutGroup>();
+        gridLayout.cellSize = new Vector2(64, 64);
+        gridLayout.spacing = new Vector2(8, 8);
+        gridLayout.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        gridLayout.constraintCount = 4;
+        gridLayout.childAlignment = TextAnchor.UpperCenter;
+
+        containerProp.objectReferenceValue = grid.GetComponent<RectTransform>();
+        so.ApplyModifiedPropertiesWithoutUndo();
+
+        EditorSceneManager.MarkSceneDirty(EditorSceneManager.GetActiveScene());
+        Selection.activeGameObject = grid;
+        Debug.Log("[InventoryUISceneBuilder] Conteneur d'équipement créé et assigné. Réglez 'Equipment Slot Count' sur InventoryUI puis Play.");
+    }
+
     private static InventorySlotUI EnsureSlotPrefab()
     {
         InventorySlotUI existing = AssetDatabase.LoadAssetAtPath<InventorySlotUI>(SlotPrefabPath);

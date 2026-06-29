@@ -34,7 +34,7 @@ All gameplay code lives flat under `Assets/Scripts/` (no subfolders yet). The ga
 
 ### Inventory & pickups
 - `Inventory` holds two separate `InventorySlot[]` arrays (hotbar + backpack, sizes set via `Configure`), with click-to-pick/click-to-place semantics (`HandleMoveClick` tracks a "held" slot) supporting stacking up to `ItemData.maxStack`. `ItemData` is a ScriptableObject (`Create > Items > Item Data`).
-- `PickupManager` is a singleton dictionary of `Vector2Int → WorldPickup` — the source of truth for "what's on the ground at this grid cell." `WorldPickup.Spawn(...)` creates dropped-item instances and self-registers; `Inventory.DropFromHotbar` refuses to drop onto an already-occupied cell.
+- `PickupManager` is a singleton dictionary of `Vector2Int → WorldPickup` — the source of truth for "what's on the ground at this grid cell." `WorldPickup.Spawn(...)` creates dropped-item instances and self-registers; `Inventory.DropSelectedItem` refuses to drop onto an already-occupied cell.
 - `InventoryUI`/`InventorySlotUI` render the two zones; `InventoryInputHandler` wires `PlayerInput` actions (toggle inventory, drop selected, hotbar number-key select) to `Inventory`/`InventoryUI`.
 
 ### Audio

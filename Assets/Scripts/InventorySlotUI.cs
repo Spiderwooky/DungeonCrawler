@@ -72,7 +72,7 @@ public class InventorySlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         if (inventoryUI == null) return false;
         InventorySlot slot = inventoryUI.GetInventorySlot(zone, slotIndex);
         if (slot == null || slot.IsEmpty) return false;
-        if (zone == InventoryZone.Backpack && !inventoryUI.IsOpen) return false;
+        if ((zone == InventoryZone.Backpack || zone == InventoryZone.Equipment) && !inventoryUI.IsOpen) return false;
         return true;
     }
 
@@ -101,7 +101,7 @@ public class InventorySlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, I
             if (amountText != null) amountText.text = string.Empty;
             if (slot == null || slot.IsEmpty)
             {
-                if (keyLabel != null && zone == InventoryZone.Backpack)
+                if (keyLabel != null && (zone == InventoryZone.Backpack || zone == InventoryZone.Equipment))
                     keyLabel.text = string.Empty;
             }
             return;
@@ -123,7 +123,7 @@ public class InventorySlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         if (amountText != null)
             amountText.text = slot.amount > 1 ? slot.amount.ToString() : string.Empty;
 
-        if (keyLabel != null && zone == InventoryZone.Backpack && slot.item.icon == null)
+        if (keyLabel != null && (zone == InventoryZone.Backpack || zone == InventoryZone.Equipment) && slot.item.icon == null)
         {
             keyLabel.text = slot.item.itemName.Length > 0
                 ? slot.item.itemName.Substring(0, Mathf.Min(3, slot.item.itemName.Length))

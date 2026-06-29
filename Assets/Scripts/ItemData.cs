@@ -25,4 +25,13 @@ public class ItemData : ScriptableObject
     [Header("Monde")]
     [Tooltip("Prefab instancié quand l'objet est jeté au sol. Si vide, un cube par défaut est utilisé.")]
     public GameObject worldPickupPrefab;
+
+    /// <summary>
+    /// Appelé quand le joueur utilise cet objet depuis le slot hotbar sélectionné (action "Use").
+    /// Retourne true si l'objet doit être consommé (1 exemplaire retiré du stack).
+    /// </summary>
+    public virtual bool OnUse(GameObject user, Inventory inventory, InventoryZone fromZone, int fromIndex)
+    {
+        return false;
+    }
 }

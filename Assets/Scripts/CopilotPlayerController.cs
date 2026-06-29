@@ -22,6 +22,10 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     [Header("Combat")]
     [SerializeField] private int attackDamage = 2;
 
+    // Dégâts effectifs de l'attaque : base + somme des bonus de tout ce qui est équipé.
+    private int CurrentAttackDamage =>
+        attackDamage + (inventory != null ? inventory.GetEquipmentAttackBonus() : 0);
+
     private CharacterController characterController;
  
     private bool isMoving;
@@ -128,11 +132,23 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     public void OnRotate(InputAction.CallbackContext context)
     {
         if (!context.performed || isMoving || isRotating) return;
- 
+
         float input = context.ReadValue<float>();
         if (Mathf.Approximately(input, 0f)) return;
- 
+
         TryRotate(input > 0 ? 1f : -1f);
+    }
+
+    // Utilise l'objet du slot hotbar sélectionné (potion, équipement...). Comme une attaque,
+    // ça consomme le tour du joueur si quelque chose a effectivement été utilisé.
+    public void OnUseItem(InputAction.CallbackContext context)
+    {
+        if (!context.performed) return;
+        if (!isMyTurn || isMoving || isRotating || isDead || Merchant.IsAnyDialogueOpen) return;
+        if (inventory == null) return;
+
+        if (inventory.UseSelectedItem(gameObject))
+            EndMyTurn();
     }
  
     // ──────────────────────────────────────────
@@ -254,7 +270,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
         HealthSystem enemyHealth = enemy.GetComponent<HealthSystem>();
         if (enemyHealth != null)
         {
-            enemyHealth.TakeDamage(attackDamage);
+            enemyHealth.TakeDamage(CurrentAttackDamage);
         }
         else
         {
