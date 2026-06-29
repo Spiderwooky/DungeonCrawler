@@ -290,8 +290,11 @@ public class EnemyController : MonoBehaviour, ITurnActor
     {
         Case[][] grid = gameManager.GetGridDefinition();
 
-        // Trouver le chemin vers le joueur (s'arrêter à côté, pas sur lui)
-        List<Vector2Int> path = Pathfinder.FindPath(grid, gridPosition, playerGrid, includeGoalEvenIfWall: true);
+        // Trouver le chemin vers le joueur (s'arrêter à côté, pas sur lui), en évitant les
+        // cases occupées par d'autres ennemis : si un chemin direct est bloqué, ça permet d'en
+        // chercher un autre plutôt que de simplement s'arrêter.
+        List<Vector2Int> blocked = GetOtherEnemyPositions();
+        List<Vector2Int> path = Pathfinder.FindPath(grid, gridPosition, playerGrid, includeGoalEvenIfWall: true, blockedCells: blocked);
 
         if (path == null || path.Count <= 1)
         {
@@ -319,7 +322,8 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
         Vector2Int target = candidates[Random.Range(0, candidates.Count)];
         Case[][] grid = gameManager.GetGridDefinition();
-        List<Vector2Int> path = Pathfinder.FindPath(grid, gridPosition, target);
+        List<Vector2Int> blocked = GetOtherEnemyPositions();
+        List<Vector2Int> path = Pathfinder.FindPath(grid, gridPosition, target, blockedCells: blocked);
 
         if (path == null || path.Count <= 1) yield break;
 
@@ -331,6 +335,20 @@ public class EnemyController : MonoBehaviour, ITurnActor
             yield return StartCoroutine(AnimateMove(GridToWorld(next)));
             gridPosition = next;
         }
+    }
+
+    // Cases actuellement occupées par les autres ennemis vivants (à éviter en pathfinding).
+    private List<Vector2Int> GetOtherEnemyPositions()
+    {
+        var positions = new List<Vector2Int>();
+        EnemyController[] enemies = FindObjectsByType<EnemyController>(FindObjectsSortMode.None);
+        foreach (EnemyController other in enemies)
+        {
+            if (other == this || other == null) continue;
+            if (other.healthSystem != null && other.healthSystem.IsDead) continue;
+            positions.Add(other.gridPosition);
+        }
+        return positions;
     }
 
     // ──────────────────────────────────────────

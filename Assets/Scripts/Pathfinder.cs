@@ -46,12 +46,17 @@ public static class Pathfinder
     /// <param name="includeGoalEvenIfWall">
     ///   Si true, le chemin peut se terminer sur un mur (utile pour s'arrêter adjacent à un ennemi/joueur).
     /// </param>
+    /// <param name="blockedCells">
+    ///   Cases supplémentaires traitées comme infranchissables (ex: cases occupées par d'autres
+    ///   ennemis), en plus des murs. Permet de chercher un chemin alternatif qui les évite.
+    /// </param>
     /// <returns>Liste ordonnée de positions de cases, ou null si introuvable.</returns>
     public static List<Vector2Int> FindPath(
         Case[][] grid,
         Vector2Int start,
         Vector2Int goal,
-        bool includeGoalEvenIfWall = false)
+        bool includeGoalEvenIfWall = false,
+        ICollection<Vector2Int> blockedCells = null)
     {
         if (grid == null) return null;
         if (start == goal) return new List<Vector2Int> { start };
@@ -80,6 +85,7 @@ public static class Pathfinder
 
                 if (closedSet.Contains(neighborPos)) continue;
                 if (!IsInBounds(grid, neighborPos))  continue;
+                if (blockedCells != null && blockedCells.Contains(neighborPos)) continue;
 
                 bool isGoal    = neighborPos == goal;
                 bool isWalkable = IsWalkable(grid, neighborPos);

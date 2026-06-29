@@ -323,6 +323,15 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
 
         yield return StartCoroutine(DoBump(direction));
 
+        // L'ennemi peut avoir été détruit pendant l'animation (ex: tué par un coup précédent,
+        // son délai de destruction s'écoule pendant ce bump) : revérifier avant GetComponent.
+        if (enemy == null)
+        {
+            isMoving = false;
+            EndMyTurn();
+            yield break;
+        }
+
         HealthSystem enemyHealth = enemy.GetComponent<HealthSystem>();
         if (enemyHealth != null)
         {
