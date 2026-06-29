@@ -18,6 +18,10 @@ public class ItemData : ScriptableObject
     [Header("Inventaire")]
     [Min(1)] public int maxStack = 1;
 
+    [Header("Économie")]
+    [Tooltip("Valeur marchande de référence (en pièces). Utilisée par les marchands pour calculer leurs prix d'achat/vente. 0 = objet sans valeur marchande (les marchands ne l'achètent pas).")]
+    [Min(0)] public int baseValue = 0;
+
     [Header("Monde")]
     [Tooltip("Prefab instancié quand l'objet est jeté au sol. Si vide, un cube par défaut est utilisé.")]
     public GameObject worldPickupPrefab;

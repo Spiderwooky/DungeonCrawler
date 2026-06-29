@@ -16,4 +16,5 @@ MonoBehaviour:
   description: Une potion de mana basique.
   icon: {fileID: 21300000, guid: d863a14933408f64bb5abb867bf2b9f6, type: 3}
   maxStack: 1
+  baseValue: 7
   worldPickupPrefab: {fileID: 82815371171145111, guid: 71564a7a58ddd964cb4793de8fac5e35, type: 3}

@@ -219,6 +219,51 @@ public class Inventory : MonoBehaviour
         return remaining;
     }
 
+    // Compte le nombre total d'exemplaires de `item` détenus (hotbar + sac).
+    public int CountItem(ItemData item)
+    {
+        if (item == null) return 0;
+        return CountInZone(InventoryZone.Hotbar, item) + CountInZone(InventoryZone.Backpack, item);
+    }
+
+    private int CountInZone(InventoryZone zone, ItemData item)
+    {
+        InventorySlot[] slots = GetSlots(zone);
+        int total = 0;
+        for (int i = 0; i < slots.Length; i++)
+            if (!slots[i].IsEmpty && slots[i].item == item) total += slots[i].amount;
+        return total;
+    }
+
+    // Retire `amount` exemplaires de `item` (sac d'abord, puis hotbar). Si le joueur n'en
+    // possède pas assez, ne retire rien et renvoie false (transaction tout-ou-rien).
+    public bool RemoveItem(ItemData item, int amount)
+    {
+        if (item == null || amount <= 0) return false;
+        if (CountItem(item) < amount) return false;
+
+        int remaining = amount;
+        remaining = RemoveFromZone(InventoryZone.Backpack, item, remaining);
+        remaining = RemoveFromZone(InventoryZone.Hotbar, item, remaining);
+
+        OnInventoryChanged?.Invoke();
+        return remaining == 0;
+    }
+
+    private int RemoveFromZone(InventoryZone zone, ItemData item, int remaining)
+    {
+        InventorySlot[] slots = GetSlots(zone);
+        for (int i = 0; i < slots.Length && remaining > 0; i++)
+        {
+            if (slots[i].IsEmpty || slots[i].item != item) continue;
+            int removed = Mathf.Min(slots[i].amount, remaining);
+            slots[i].amount -= removed;
+            remaining -= removed;
+            if (slots[i].amount <= 0) slots[i].Clear();
+        }
+        return remaining;
+    }
+
     public bool DropFromHotbar(int hotbarIndex)
     {
         if (gameManager == null) return false;

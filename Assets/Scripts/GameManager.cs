@@ -22,6 +22,10 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private RoomManager roomManager;
 
+    [Tooltip("Fait apparaître les marchandes dans les salles vides du donjon généré. Optionnel.")]
+    [SerializeField]
+    private MerchantSpawner merchantSpawner;
+
     // Case de départ du joueur, en coordonnées grille (x, z).
     // Recalculée automatiquement dans AssignStartPositionFromStartRoom() au lancement.
     [SerializeField]
@@ -96,6 +100,11 @@ public class GameManager : MonoBehaviour
         else
         {
             Debug.LogWarning("[GameManager] RoomManager non assigné : les salles ne seront pas peuplées d'ennemis.");
+        }
+
+        if (merchantSpawner != null)
+        {
+            merchantSpawner.InitializeMerchants(this, bspGenerator.GetRooms(), start);
         }
 
         gridGenerator.GenerateGridAndTerrain(this);

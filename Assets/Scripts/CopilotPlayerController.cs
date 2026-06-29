@@ -10,7 +10,8 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
 {
     [SerializeField] private GameManager gameManager;
     [SerializeField] private Inventory inventory;
- 
+    [SerializeField] private PlayerWallet playerWallet;
+
     [Header("Animation")]
     [SerializeField] private float moveDuration         = 0.3f;
     [SerializeField] private float rotationDuration     = 0.2f;
@@ -38,6 +39,9 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
 
         if (inventory == null)
             inventory = GetComponent<Inventory>();
+
+        if (playerWallet == null)
+            playerWallet = GetComponent<PlayerWallet>();
 
         // ── Intégration audio ──
         // S'abonner aux événements de santé du joueur
@@ -138,9 +142,18 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     public void TryMove(Vector3 direction)
     {
         // Si pas mon tour, déjà en cours d'animation, OU mort : on ignore
-        if (!isMyTurn || isMoving || isRotating || isDead) return;
+        if (!isMyTurn || isMoving || isRotating || isDead || Merchant.IsAnyDialogueOpen) return;
  
         Vector3 targetPosition = transform.position + direction * gameManager.GetStep();
+
+        // Si une marchande est sur la case cible → ouvrir le dialogue au lieu de se déplacer.
+        // Ne consomme pas le tour (action gratuite, comme un bump de mur).
+        Merchant merchant = GetMerchantAtPosition(targetPosition);
+        if (merchant != null)
+        {
+            merchant.OpenDialogue(inventory, playerWallet);
+            return;
+        }
 
         // Si une entité ennemie est sur la case cible → attaquer au lieu de se déplacer
         EnemyController enemy = GetEnemyAtPosition(targetPosition);
@@ -159,6 +172,22 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
             StartCoroutine(BumpAgainstWall(direction));
             // Le bump ne consomme pas de tour
         }
+    }
+
+    // Cherche un Merchant dont la position monde correspond à la case cible.
+    private Merchant GetMerchantAtPosition(Vector3 targetPosition)
+    {
+        float step = gameManager.GetStep();
+        Vector2Int targetCell = GridUtils.WorldToGrid(targetPosition, step);
+
+        Merchant[] merchants = Object.FindObjectsByType<Merchant>(FindObjectsSortMode.None);
+        foreach (var m in merchants)
+        {
+            if (m == null) continue;
+            if (GridUtils.WorldToGrid(m.transform.position, step) == targetCell) return m;
+        }
+
+        return null;
     }
 
     // Cherche un EnemyController dont la position monde correspond à la case cible.
@@ -295,7 +324,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
  
     public void TryRotate(float direction)
     {
-        if (!isMyTurn || isMoving || isRotating || isDead) return;
+        if (!isMyTurn || isMoving || isRotating || isDead || Merchant.IsAnyDialogueOpen) return;
  
         float deltaAngle = direction > 0 ? rotationAngle : -rotationAngle;
         StartCoroutine(RotateSmoothly(deltaAngle));
