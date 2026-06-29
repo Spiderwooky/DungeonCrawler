@@ -58,14 +58,16 @@ public class WorldPickup : MonoBehaviour
         Destroy(gameObject);
     }
 
-    public static WorldPickup Spawn(ItemData data, int spawnAmount, Vector3 worldPosition)
+    public static WorldPickup Spawn(ItemData data, int spawnAmount, Vector3 worldPosition, bool playDropSound = true)
     {
         if (data == null) return null;
 
         GameObject go;
         if (data.worldPickupPrefab != null)
         {
-            go = Instantiate(data.worldPickupPrefab, worldPosition, Quaternion.identity);
+            // Conserver la rotation d'origine du prefab (ex: objet incliné pour paraître posé
+            // au sol) plutôt que de la réinitialiser à plat.
+            go = Instantiate(data.worldPickupPrefab, worldPosition, data.worldPickupPrefab.transform.rotation);
         }
         else
         {
@@ -91,8 +93,10 @@ public class WorldPickup : MonoBehaviour
         pickup.SnapToGrid();
         WorldPickup.EnsurePickupManagerExists();
         pickup.RegisterAtGridPosition();
-        // Jouer un son de dépôt quand un objet est spawn dans le monde
-        AudioManager.EnsureInstance()?.PlayDropItem();
+        // Jouer un son de dépôt quand un objet est spawn dans le monde (mais pas pour les
+        // objets placés par la génération de niveau, ex: la clé dans la salle de départ).
+        if (playDropSound)
+            AudioManager.EnsureInstance()?.PlayDropItem();
         return pickup;
     }
 

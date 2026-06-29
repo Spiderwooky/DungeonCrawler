@@ -51,6 +51,11 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private GameObject endRoomPrefab;
 
+    [Header("Clé de fin de donjon")]
+    [Tooltip("Objet nécessaire pour franchir la porte de la salle de fin. Apparaît au sol dans la salle de départ au lancement. CopilotPlayerController lit cette même référence (GetKeyItemData) pour vérifier l'inventaire du joueur.")]
+    [SerializeField]
+    private ItemData keyItemData;
+
     private Case[][] gridDefinition;
 
     // Direction (case porte - case de départ) vers laquelle orienter le joueur au lancement,
@@ -123,6 +128,30 @@ public class GameManager : MonoBehaviour
 
         gridGenerator.GenerateGridAndTerrain(this);
         SpawnPresetRoomPrefabs();
+        SpawnKeyPickup();
+    }
+
+    // Fait apparaître la clé de fin de donjon au sol dans la salle de départ (sur une case
+    // différente de celle où le joueur démarre, pour qu'il doive la ramasser explicitement).
+    private void SpawnKeyPickup()
+    {
+        if (keyItemData == null) return;
+
+        System.Collections.Generic.List<RoomInfo> rooms = bspGenerator.GetRooms();
+        RoomInfo startRoom = rooms.Find(r => r.Type == RoomType.Start);
+        if (startRoom == null || startRoom.Cells.Count == 0) return;
+
+        Vector2Int cell = startRoom.Cells[0];
+        foreach (Vector2Int c in startRoom.Cells)
+        {
+            if (c != start)
+            {
+                cell = c;
+                break;
+            }
+        }
+
+        WorldPickup.Spawn(keyItemData, 1, GridUtils.GridToWorld(cell, step), playDropSound: false);
     }
 
     // Instancie les prefabs de salles pré-faites (Start/End) à l'emplacement choisi par
@@ -280,4 +309,13 @@ public class GameManager : MonoBehaviour
     public GameObject GetTerrain() => terrain;
     public GameObject GetFloorPrefab() => floorPrefab;
     public System.Collections.Generic.List<RoomInfo> GetRooms() => bspGenerator != null ? bspGenerator.GetRooms() : null;
+    public ItemData GetKeyItemData() => keyItemData;
+
+    // Case de la porte de la salle de fin, ou null si la salle de fin n'a pas pu être placée.
+    public Vector2Int? GetEndDoorCell()
+    {
+        System.Collections.Generic.List<RoomInfo> rooms = GetRooms();
+        RoomInfo endRoom = rooms?.Find(r => r.Type == RoomType.End);
+        return endRoom?.DoorCell;
+    }
 }

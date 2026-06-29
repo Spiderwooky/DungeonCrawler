@@ -22,16 +22,22 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     [Header("Combat")]
     [SerializeField] private int attackDamage = 2;
 
+    [Header("Fin de donjon")]
+    [SerializeField] private TemporaryMessageUI messageUI;
+    [SerializeField] private LevelEndUI levelEndUI;
+    [SerializeField] private string keyRequiredMessage = "Il faut trouver la clé pour franchir cette porte.";
+
     // Dégâts effectifs de l'attaque : base + somme des bonus de tout ce qui est équipé.
     private int CurrentAttackDamage =>
         attackDamage + (inventory != null ? inventory.GetEquipmentAttackBonus() : 0);
 
     private CharacterController characterController;
- 
+
     private bool isMoving;
     private bool isRotating;
     private bool isMyTurn; // Vrai seulement quand le TurnManager a donné la main au joueur
     private bool isDead;   // Mis à true par OnDeath (HealthSystem) : bloque tout mouvement/rotation
+    private bool levelCompleted; // Mis à true en franchissant la porte de fin avec la clé : bloque tout mouvement/rotation
  
     // ──────────────────────────────────────────
     // Initialisation
@@ -153,7 +159,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     public void OnUseItem(InputAction.CallbackContext context)
     {
         if (!context.performed) return;
-        if (!isMyTurn || isMoving || isRotating || isDead || Merchant.IsAnyDialogueOpen) return;
+        if (!isMyTurn || isMoving || isRotating || isDead || levelCompleted || Merchant.IsAnyDialogueOpen) return;
         if (inventory == null) return;
 
         if (inventory.UseSelectedItem(gameObject))
@@ -167,7 +173,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
     public void TryMove(Vector3 direction)
     {
         // Si pas mon tour, déjà en cours d'animation, OU mort : on ignore
-        if (!isMyTurn || isMoving || isRotating || isDead || Merchant.IsAnyDialogueOpen) return;
+        if (!isMyTurn || isMoving || isRotating || isDead || levelCompleted || Merchant.IsAnyDialogueOpen) return;
  
         Vector3 targetPosition = transform.position + direction * gameManager.GetStep();
 
@@ -188,6 +194,14 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
             return;
         }
 
+        // Si la case cible est la porte de la salle de fin → vérifier la clé au lieu de
+        // traiter ça comme un simple mur.
+        if (IsEndDoor(targetPosition))
+        {
+            TryOpenEndDoor(direction);
+            return;
+        }
+
         if (IsCellWalkable(targetPosition))
         {
             StartCoroutine(MoveToPosition(targetPosition));
@@ -197,6 +211,39 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
             StartCoroutine(BumpAgainstWall(direction));
             // Le bump ne consomme pas de tour
         }
+    }
+
+    // Vrai si `targetPosition` correspond à la case de la porte de la salle de fin.
+    private bool IsEndDoor(Vector3 targetPosition)
+    {
+        Vector2Int? doorCell = gameManager.GetEndDoorCell();
+        if (!doorCell.HasValue) return false;
+
+        return GridUtils.WorldToGrid(targetPosition, gameManager.GetStep()) == doorCell.Value;
+    }
+
+    // Avec la clé en inventaire : déclenche la fin de partie (écran de fin, musique, blocage
+    // des mouvements). Sans la clé : bump normal + message temporaire.
+    private void TryOpenEndDoor(Vector3 direction)
+    {
+        ItemData keyItemData = gameManager.GetKeyItemData();
+        bool hasKey = keyItemData != null && inventory != null && inventory.CountItem(keyItemData) > 0;
+
+        if (!hasKey)
+        {
+            StartCoroutine(BumpAgainstWall(direction));
+            if (messageUI != null)
+                messageUI.Show(keyRequiredMessage);
+            return;
+        }
+
+        levelCompleted = true;
+
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayMusicCredits();
+
+        if (levelEndUI != null)
+            levelEndUI.ShowEndScreen();
     }
 
     // Cherche un Merchant dont la position monde correspond à la case cible.
@@ -349,7 +396,7 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
  
     public void TryRotate(float direction)
     {
-        if (!isMyTurn || isMoving || isRotating || isDead || Merchant.IsAnyDialogueOpen) return;
+        if (!isMyTurn || isMoving || isRotating || isDead || levelCompleted || Merchant.IsAnyDialogueOpen) return;
  
         float deltaAngle = direction > 0 ? rotationAngle : -rotationAngle;
         StartCoroutine(RotateSmoothly(deltaAngle));
