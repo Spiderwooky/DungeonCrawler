@@ -90,6 +90,15 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
         // Désactiver le CharacterController le temps du snap pour éviter les conflits
         characterController.enabled = false;
         transform.position = GridUtils.GridToWorld(startCell, gameManager.GetStep());
+
+        // Si la salle de départ a une porte, démarrer face à elle (case "devant la porte").
+        Vector2Int? facing = gameManager.GetStartFacing();
+        if (facing.HasValue && facing.Value != Vector2Int.zero)
+        {
+            Vector3 direction = new Vector3(facing.Value.x, 0f, facing.Value.y);
+            transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+        }
+
         characterController.enabled = true;
     }
  

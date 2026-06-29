@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // Instancie le terrain 3D à partir de la grille fournie par GameManager.
@@ -39,12 +40,18 @@ public class GridGenerator : MonoBehaviour
 
         if (!ValidateFloorPrefab(floorPrefab)) return;
 
+        List<RoomInfo> presetRoomBounds = GetPresetRoomBounds();
+
         for (int i = 0; i < grid.Length; i++)
         {
             for (int j = 0; j < grid[i].Length; j++)
             {
                 Case cell = grid[i][j];
                 if (cell == null) continue;
+
+                // Les salles pré-faites (Start/End) ont leur propre modèle (murs/sol inclus),
+                // instancié par GameManager : ne pas y poser de tuile de sol procédurale.
+                if (IsInsidePresetRoom(i, j, presetRoomBounds)) continue;
 
                 // Une case mur isolée (entourée de sol) se reclasse en sol-avec-pilier ;
                 // une case mur "normale" ne génère rien du tout.
@@ -60,6 +67,32 @@ public class GridGenerator : MonoBehaviour
                 cell.SetModel(instance);
             }
         }
+    }
+
+    // Salles dont le générateur procédural ne doit pas poser de tuile de sol (leur modèle
+    // pré-fait, instancié par GameManager, fournit déjà tout : sol, murs, porte).
+    private List<RoomInfo> GetPresetRoomBounds()
+    {
+        var result = new List<RoomInfo>();
+        List<RoomInfo> rooms = gameManager.GetRooms();
+        if (rooms == null) return result;
+
+        foreach (RoomInfo room in rooms)
+        {
+            if (room.Type == RoomType.Start || room.Type == RoomType.End)
+                result.Add(room);
+        }
+        return result;
+    }
+
+    private bool IsInsidePresetRoom(int x, int z, List<RoomInfo> presetRooms)
+    {
+        foreach (RoomInfo room in presetRooms)
+        {
+            if (room.Bounds.Contains(new Vector2Int(x, z)))
+                return true;
+        }
+        return false;
     }
 
     // Active les bonnes décorations de bord (murs/coins/pilier) sur la tuile instanciée.

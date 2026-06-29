@@ -5,6 +5,7 @@ using UnityEngine;
 public enum RoomType
 {
     Start,   // Salle de départ du joueur : jamais de monstres ni d'objets.
+    End,     // Salle de fin du donjon : jamais de monstres ni d'objets.
     Monster, // Salle pouvant contenir des ennemis, avec repop après un délai.
     Empty,   // Salle sans monstres, pour varier le rythme d'exploration.
 }
@@ -19,16 +20,25 @@ public class RoomInfo
     public readonly RectInt Bounds;
     public readonly int MaxEnemies;
 
+    // Uniquement renseignés pour les salles pré-faites (Start/End) ayant une porte dans leur
+    // motif : la case de la porte elle-même, et la case de sol juste à l'intérieur (= "devant
+    // la porte"). Utilisé par GameManager pour placer/orienter le joueur au départ.
+    public readonly Vector2Int? DoorCell;
+    public readonly Vector2Int? DoorAdjacentCell;
+
     // État runtime suivi par RoomManager.
     public readonly List<EnemyController> AliveEnemies = new List<EnemyController>();
     public int LastRoundPlayerPresent;
 
-    public RoomInfo(int id, RoomType type, List<Vector2Int> cells, RectInt bounds, int maxEnemies)
+    public RoomInfo(int id, RoomType type, List<Vector2Int> cells, RectInt bounds, int maxEnemies,
+        Vector2Int? doorCell = null, Vector2Int? doorAdjacentCell = null)
     {
         Id = id;
         Type = type;
         Cells = cells;
         Bounds = bounds;
         MaxEnemies = maxEnemies;
+        DoorCell = doorCell;
+        DoorAdjacentCell = doorAdjacentCell;
     }
 }

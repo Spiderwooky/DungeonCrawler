@@ -42,7 +42,21 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private GameObject floorPrefab;
 
+    [Header("Salles spéciales (pré-faites)")]
+    [Tooltip("Prefab instancié à l'emplacement de la salle de départ (motif fixe StartRoomPattern dans BspDungeonGenerator). Inclut son propre sol/murs/porte : GridGenerator ne pose pas de tuile procédurale sur ses cases.")]
+    [SerializeField]
+    private GameObject startRoomPrefab;
+
+    [Tooltip("Prefab instancié à l'emplacement de la salle de fin (motif fixe EndRoomPattern dans BspDungeonGenerator). Même principe que Start Room Prefab.")]
+    [SerializeField]
+    private GameObject endRoomPrefab;
+
     private Case[][] gridDefinition;
+
+    // Direction (case porte - case de départ) vers laquelle orienter le joueur au lancement,
+    // calculée dans AssignStartPositionFromStartRoom(). Null si la salle de départ n'a pas de
+    // porte connue (repli sur l'ancienne heuristique de placement).
+    private Vector2Int? startFacing;
  
     // ──────────────────────────────────────────
     // Awake : initialisation de la grille
@@ -108,9 +122,38 @@ public class GameManager : MonoBehaviour
         }
 
         gridGenerator.GenerateGridAndTerrain(this);
+        SpawnPresetRoomPrefabs();
     }
 
-    // Place le point de départ du joueur dans la salle taguée RoomType.Start par le générateur.
+    // Instancie les prefabs de salles pré-faites (Start/End) à l'emplacement choisi par
+    // BspDungeonGenerator. Pas d'effet si le prefab correspondant n'est pas assigné, ou si
+    // la salle n'a pas pu être placée (grille trop petite : voir les avertissements de
+    // BspDungeonGenerator).
+    private void SpawnPresetRoomPrefabs()
+    {
+        System.Collections.Generic.List<RoomInfo> rooms = bspGenerator.GetRooms();
+        SpawnPresetRoomPrefab(rooms, RoomType.Start, startRoomPrefab);
+        SpawnPresetRoomPrefab(rooms, RoomType.End, endRoomPrefab);
+    }
+
+    private void SpawnPresetRoomPrefab(System.Collections.Generic.List<RoomInfo> rooms, RoomType type, GameObject prefab)
+    {
+        if (prefab == null) return;
+
+        RoomInfo room = rooms.Find(r => r.Type == type);
+        if (room == null) return;
+
+        // Origine = coin sud-ouest de la salle (case xMin,yMin = case en bas à gauche du
+        // motif ASCII) : le prefab doit avoir son pivot sur cette case, pas au centre.
+        RectInt bounds = room.Bounds;
+        Vector3 worldPos = new Vector3(bounds.xMin * step, 0f, bounds.yMin * step);
+
+        Instantiate(prefab, worldPos, Quaternion.identity, terrain.transform);
+    }
+
+    // Place le point de départ du joueur dans la salle taguée RoomType.Start par le générateur,
+    // juste devant sa porte (si le motif pré-fait en a une) en l'orientant vers l'intérieur
+    // de la salle (dos à la porte).
     private void AssignStartPositionFromStartRoom()
     {
         if (gridDefinition == null) return;
@@ -122,11 +165,20 @@ public class GameManager : MonoBehaviour
         {
             Debug.LogWarning("[GameManager] Aucune salle de départ trouvée : le joueur démarre en (1,1).");
             start = new Vector2Int(1, 1);
+            startFacing = null;
+            return;
+        }
+
+        if (startRoom.DoorAdjacentCell.HasValue && startRoom.DoorCell.HasValue)
+        {
+            start = startRoom.DoorAdjacentCell.Value;
+            startFacing = startRoom.DoorAdjacentCell.Value - startRoom.DoorCell.Value;
             return;
         }
 
         Vector2 center = startRoom.Bounds.center;
         start = FindNearestGround(Mathf.RoundToInt(center.x), Mathf.RoundToInt(center.y), startRoom.Cells);
+        startFacing = null;
     }
 
     private Vector2Int FindNearestGround(int x, int z, System.Collections.Generic.List<Vector2Int> groundCells)
@@ -223,7 +275,9 @@ public class GameManager : MonoBehaviour
     // ──────────────────────────────────────────
  
     public Vector2Int GetStart() => start;
+    public Vector2Int? GetStartFacing() => startFacing;
     public float GetStep() => step;
     public GameObject GetTerrain() => terrain;
     public GameObject GetFloorPrefab() => floorPrefab;
+    public System.Collections.Generic.List<RoomInfo> GetRooms() => bspGenerator != null ? bspGenerator.GetRooms() : null;
 }

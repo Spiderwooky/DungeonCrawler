@@ -80,6 +80,11 @@ public class BspDungeonGenerator : MonoBehaviour
     private int[][] roomIds;
     private List<RoomInfo> rooms;
     private System.Random random;
+
+    // Cases strictement interdites au carving de couloirs (tout le pourtour des salles
+    // pré-faites — murs et porte —, sauf leur unique case de connexion). Sans ça, le A* des
+    // couloirs peut tunneliser à travers n'importe quel mur (coût plus élevé mais pas interdit).
+    private readonly HashSet<Vector2Int> corridorBlockedCells = new HashSet<Vector2Int>();
     private readonly Case wallCase = new Case(CellType.Wall);
     private readonly Case groundCase = new Case(CellType.Ground);
     private static readonly Vector2Int[] Directions =
@@ -88,6 +93,33 @@ public class BspDungeonGenerator : MonoBehaviour
         Vector2Int.down,
         Vector2Int.left,
         Vector2Int.right,
+    };
+
+    // Motifs des salles pré-faites (Start/End), dessinés à la main : W = mur, G = sol,
+    // P = porte (visuelle uniquement pour l'instant, infranchissable comme un mur).
+    // Convention : ligne 0 du tableau = nord (z max), dernière ligne = sud (z min) ;
+    // colonne 0 = ouest (x min), dernière colonne = est (x max). Le prefab de salle est
+    // instancié sans rotation : si l'orientation ne correspond pas au modèle, ajuster la
+    // rotation du prefab dans l'Inspector (StartRoomPrefab/EndRoomPrefab sur GameManager).
+    private static readonly string[] StartRoomPattern =
+    {
+        "WWGWWW",
+        "WGGGWW",
+        "WGGGGW",
+        "WGGGGW",
+        "WWGGGW",
+        "WWWPWW",
+    };
+
+    private static readonly string[] EndRoomPattern =
+    {
+        "WWWPWWW",
+        "WWGGGWW",
+        "WGWGWGW",
+        "WGGGGGW",
+        "WGWGWGW",
+        "WWGGGWW",
+        "WWWGWWW",
     };
 
     private void Awake()
@@ -178,10 +210,263 @@ public class BspDungeonGenerator : MonoBehaviour
 
         Leaf root = new Leaf(0, 0, width, height);
         List<Leaf> leaves = SplitLeaves(root);
+        ReservePresetRooms(leaves);
         CreateRooms(leaves);
         CarveRooms(leaves);
         ConnectRooms(leaves);
         BuildRoomInfos(leaves);
+    }
+
+    // Réserve deux feuilles BSP pour les salles pré-faites Start/End (motifs fixes ci-dessus)
+    // avant la génération aléatoire des autres salles : on choisit, parmi toutes les paires de
+    // feuilles assez grandes pour chaque motif, celle qui maximise la distance entre les deux —
+    // ça les pousse chacune vers une extrémité du donjon plutôt que de figer Start au centre.
+    // Si aucune paire valide n'existe (grille trop petite), on se contente d'un avertissement :
+    // CreateRooms/BuildRoomInfos retombent alors sur le comportement aléatoire habituel.
+    private void ReservePresetRooms(List<Leaf> leaves)
+    {
+        List<Leaf> startCandidates = FindCandidateLeaves(leaves, StartRoomPattern);
+        List<Leaf> endCandidates = FindCandidateLeaves(leaves, EndRoomPattern);
+
+        Leaf startLeaf = null;
+        Leaf endLeaf = null;
+        float bestDistance = -1f;
+
+        foreach (Leaf a in startCandidates)
+        {
+            Vector2 centerA = new Vector2(a.x + a.width / 2f, a.z + a.height / 2f);
+            foreach (Leaf b in endCandidates)
+            {
+                if (a == b) continue;
+
+                float distance = LeafCenterDistance(b, centerA);
+                if (distance > bestDistance)
+                {
+                    bestDistance = distance;
+                    startLeaf = a;
+                    endLeaf = b;
+                }
+            }
+        }
+
+        if (startLeaf != null)
+        {
+            ApplyPreset(startLeaf, StartRoomPattern, RoomType.Start);
+        }
+        else
+        {
+            Debug.LogWarning($"[BspDungeonGenerator] Aucune feuille BSP assez grande ({StartRoomPattern[0].Length}x{StartRoomPattern.Length} requis) pour la salle de départ pré-faite : repli sur une salle générée aléatoirement. Augmentez width/height si besoin.");
+        }
+
+        if (endLeaf != null)
+        {
+            ApplyPreset(endLeaf, EndRoomPattern, RoomType.End);
+        }
+        else
+        {
+            Debug.LogWarning($"[BspDungeonGenerator] Aucune paire de feuilles BSP assez grandes et assez éloignées ({EndRoomPattern[0].Length}x{EndRoomPattern.Length} requis pour la fin) : pas de salle de fin cette partie. Augmentez width/height si besoin.");
+        }
+
+        corridorBlockedCells.Clear();
+        if (startLeaf != null) BlockFootprintForCorridors(startLeaf);
+        if (endLeaf != null) BlockFootprintForCorridors(endLeaf);
+    }
+
+    private List<Leaf> FindCandidateLeaves(List<Leaf> leaves, string[] pattern)
+    {
+        int neededWidth = pattern[0].Length;
+        int neededHeight = pattern.Length;
+        (int connectorRow, int connectorCol) = FindConnectorPosition(pattern);
+
+        List<Leaf> candidates = new List<Leaf>();
+        foreach (Leaf leaf in leaves)
+        {
+            if (leaf.IsPreset) continue;
+            if (leaf.width < neededWidth || leaf.height < neededHeight) continue;
+            // Rejette les feuilles où le connecteur (toujours sur un bord du motif) finirait
+            // collé au bord de la grille : son unique voisin extérieur doit rester dans la
+            // grille, sinon aucun couloir ne peut jamais l'atteindre.
+            if (!HasRoomForConnectorOutside(leaf, pattern, connectorRow, connectorCol)) continue;
+            candidates.Add(leaf);
+        }
+        return candidates;
+    }
+
+    // Trouve la position (ligne, colonne) de l'unique case de sol en bord de motif (hors
+    // porte) — le connecteur utilisé par ConnectRooms pour relier la salle au reste du donjon.
+    private static (int row, int col) FindConnectorPosition(string[] pattern)
+    {
+        int patternWidth = pattern[0].Length;
+        int patternHeight = pattern.Length;
+
+        for (int row = 0; row < patternHeight; row++)
+        {
+            for (int col = 0; col < patternWidth; col++)
+            {
+                if (pattern[row][col] == 'G' && IsBoundaryCell(row, col, patternWidth, patternHeight))
+                    return (row, col);
+            }
+        }
+        return (-1, -1);
+    }
+
+    // Direction vers laquelle le connecteur s'ouvre (vers l'extérieur du motif), déduite du
+    // bord du motif sur lequel il se trouve.
+    private static Vector2Int GetOutwardDirection(int row, int col, int patternHeight)
+    {
+        if (row == 0) return new Vector2Int(0, 1);                 // nord (ligne 0 = z max)
+        if (row == patternHeight - 1) return new Vector2Int(0, -1); // sud
+        if (col == 0) return new Vector2Int(-1, 0);                 // ouest
+        return new Vector2Int(1, 0);                                // est
+    }
+
+    private void ComputePresetOrigin(Leaf leaf, int patternWidth, int patternHeight, out int originX, out int originZ)
+    {
+        originX = leaf.x + (leaf.width - patternWidth) / 2;
+        originZ = leaf.z + (leaf.height - patternHeight) / 2;
+    }
+
+    private bool HasRoomForConnectorOutside(Leaf leaf, string[] pattern, int connectorRow, int connectorCol)
+    {
+        if (connectorRow < 0) return true; // motif sans connecteur (ne devrait pas arriver ici)
+
+        int patternWidth = pattern[0].Length;
+        int patternHeight = pattern.Length;
+
+        ComputePresetOrigin(leaf, patternWidth, patternHeight, out int originX, out int originZ);
+
+        int connectorX = originX + connectorCol;
+        int connectorZ = originZ + patternHeight - 1 - connectorRow;
+
+        Vector2Int outward = GetOutwardDirection(connectorRow, connectorCol, patternHeight);
+        int outsideX = connectorX + outward.x;
+        int outsideZ = connectorZ + outward.y;
+
+        return outsideX >= 0 && outsideX < width && outsideZ >= 0 && outsideZ < height;
+    }
+
+    private static float LeafCenterDistance(Leaf leaf, Vector2 point)
+    {
+        Vector2 center = new Vector2(leaf.x + leaf.width / 2f, leaf.z + leaf.height / 2f);
+        return Vector2.Distance(center, point);
+    }
+
+    // Interdit au carving de couloirs tout le pourtour (murs + porte) d'une salle pré-faite,
+    // sauf son unique case de connexion.
+    private void BlockFootprintForCorridors(Leaf leaf)
+    {
+        RectInt bounds = leaf.FullFootprint;
+        for (int x = bounds.xMin; x < bounds.xMax; x++)
+        {
+            for (int z = bounds.yMin; z < bounds.yMax; z++)
+            {
+                Vector2Int cell = new Vector2Int(x, z);
+                if (cell != leaf.ConnectorCell)
+                    corridorBlockedCells.Add(cell);
+            }
+        }
+    }
+
+    // Carve immédiatement le motif fixe dans `grid` (avant que CreateRooms n'assigne les
+    // Id de salle) et mémorise sur la feuille : `room` = la zone intérieure réellement
+    // occupée par le modèle 3D (bounding box des cases de sol hors case de connexion en bord
+    // de motif — c'est plus petit que le motif dessiné, qui inclut aussi mur/porte/couloir
+    // pour la lisibilité du schéma), `FullFootprint` = le motif complet (pour le blocage de
+    // couloirs), et la porte (case + case intérieure adjacente, pour GameManager).
+    private void ApplyPreset(Leaf leaf, string[] pattern, RoomType type)
+    {
+        int patternWidth = pattern[0].Length;
+        int patternHeight = pattern.Length;
+
+        ComputePresetOrigin(leaf, patternWidth, patternHeight, out int originX, out int originZ);
+
+        leaf.IsPreset = true;
+        leaf.PresetType = type;
+        leaf.FullFootprint = new RectInt(originX, originZ, patternWidth, patternHeight);
+
+        int innerMinX = int.MaxValue, innerMinZ = int.MaxValue;
+        int innerMaxX = int.MinValue, innerMaxZ = int.MinValue;
+
+        for (int row = 0; row < patternHeight; row++)
+        {
+            // Ligne 0 du motif = nord = z le plus grand du rectangle.
+            int z = originZ + patternHeight - 1 - row;
+            string line = pattern[row];
+
+            for (int col = 0; col < patternWidth; col++)
+            {
+                int x = originX + col;
+                char c = line[col];
+                bool boundary = IsBoundaryCell(row, col, patternWidth, patternHeight);
+
+                if (c == 'G')
+                {
+                    grid[x][z] = groundCase;
+
+                    if (boundary)
+                    {
+                        leaf.ConnectorCell = new Vector2Int(x, z);
+                    }
+                    else
+                    {
+                        if (x < innerMinX) innerMinX = x;
+                        if (x > innerMaxX) innerMaxX = x;
+                        if (z < innerMinZ) innerMinZ = z;
+                        if (z > innerMaxZ) innerMaxZ = z;
+                    }
+                }
+                else
+                {
+                    grid[x][z] = wallCase;
+
+                    if (c == 'P')
+                    {
+                        leaf.HasDoor = true;
+                        leaf.DoorCell = new Vector2Int(x, z);
+                    }
+                }
+            }
+        }
+
+        leaf.room = new RectInt(innerMinX, innerMinZ, innerMaxX - innerMinX + 1, innerMaxZ - innerMinZ + 1);
+        leaf.roomA = leaf.room;
+        leaf.roomB = null;
+
+        if (leaf.HasDoor)
+        {
+            leaf.DoorAdjacentCell = FindGroundNeighbor(leaf.DoorCell);
+        }
+    }
+
+    private static bool IsBoundaryCell(int row, int col, int patternWidth, int patternHeight) =>
+        row == 0 || row == patternHeight - 1 || col == 0 || col == patternWidth - 1;
+
+    private Vector2Int FindGroundNeighbor(Vector2Int cell)
+    {
+        foreach (Vector2Int dir in Directions)
+        {
+            Vector2Int neighbor = cell + dir;
+            if (IsInBounds(grid, neighbor) && grid[neighbor.x][neighbor.y].IsGround())
+                return neighbor;
+        }
+        return cell;
+    }
+
+    // Tague roomIds pour les cases de sol d'une salle pré-faite, une fois leaf.Id assigné
+    // par CreateRooms (le motif lui-même a déjà été carvé dans grid par ApplyPreset).
+    private void StampPresetRoomIds(Leaf leaf)
+    {
+        if (!leaf.room.HasValue) return;
+
+        RectInt bounds = leaf.room.Value;
+        for (int x = bounds.xMin; x < bounds.xMax; x++)
+        {
+            for (int z = bounds.yMin; z < bounds.yMax; z++)
+            {
+                if (grid[x][z].IsGround())
+                    roomIds[x][z] = leaf.Id;
+            }
+        }
     }
 
     private void InitializeGrid()
@@ -222,7 +507,11 @@ public class BspDungeonGenerator : MonoBehaviour
             }
         }
 
-        Leaf startLeaf = FindStartLeaf(leaves);
+        // Salle de départ/fin : la feuille réservée par ReservePresetRooms si elle a pu être
+        // placée, sinon (grille trop petite) on retombe sur l'ancienne heuristique pour Start
+        // et il n'y a simplement pas de salle End.
+        Leaf startLeaf = leaves.Find(l => l.IsPreset && l.PresetType == RoomType.Start) ?? FindStartLeaf(leaves);
+        Leaf endLeaf = leaves.Find(l => l.IsPreset && l.PresetType == RoomType.End);
 
         rooms = new List<RoomInfo>();
         foreach (Leaf leaf in leaves)
@@ -230,15 +519,19 @@ public class BspDungeonGenerator : MonoBehaviour
             if (!leaf.room.HasValue) continue;
             if (!cellsByRoomId.TryGetValue(leaf.Id, out List<Vector2Int> roomCells) || roomCells.Count == 0) continue;
 
-            RoomType type = leaf == startLeaf
-                ? RoomType.Start
-                : (random.NextDouble() < emptyRoomChance ? RoomType.Empty : RoomType.Monster);
+            RoomType type;
+            if (leaf == startLeaf) type = RoomType.Start;
+            else if (leaf == endLeaf) type = RoomType.End;
+            else type = random.NextDouble() < emptyRoomChance ? RoomType.Empty : RoomType.Monster;
 
             int maxEnemies = type == RoomType.Monster
                 ? random.Next(minEnemiesPerRoom, maxEnemiesPerRoom + 1)
                 : 0;
 
-            rooms.Add(new RoomInfo(leaf.Id, type, roomCells, leaf.room.Value, maxEnemies));
+            Vector2Int? doorCell = leaf.HasDoor ? leaf.DoorCell : (Vector2Int?)null;
+            Vector2Int? doorAdjacentCell = leaf.HasDoor ? leaf.DoorAdjacentCell : (Vector2Int?)null;
+
+            rooms.Add(new RoomInfo(leaf.Id, type, roomCells, leaf.room.Value, maxEnemies, doorCell, doorAdjacentCell));
         }
     }
 
@@ -301,6 +594,9 @@ public class BspDungeonGenerator : MonoBehaviour
         foreach (Leaf leaf in leaves)
         {
             leaf.Id = nextRoomId++;
+
+            // Salle pré-faite (Start/End) : room/roomA/roomB déjà fixés par ApplyPreset.
+            if (leaf.IsPreset) continue;
 
             // Déterminer des limites sûres pour la taille des salles à l'intérieur de la feuille
             int maxAvailableWidth = Mathf.Max(1, leaf.width - 2); // laisser 1 case de bordure de chaque côté
@@ -399,7 +695,16 @@ public class BspDungeonGenerator : MonoBehaviour
         List<Vector2Int> roomCenters = new List<Vector2Int>();
         foreach (Leaf leaf in leaves)
         {
-            if (leaf.room.HasValue)
+            if (!leaf.room.HasValue) continue;
+
+            // Une salle pré-faite n'a qu'une seule case de sol en bord de motif (hors porte) :
+            // les couloirs doivent viser précisément cette case, pas le centre géométrique
+            // (qui peut tomber sur un mur/pilier du motif).
+            if (leaf.IsPreset)
+            {
+                roomCenters.Add(leaf.ConnectorCell);
+            }
+            else
             {
                 Vector2 center = leaf.room.Value.center;
                 roomCenters.Add(new Vector2Int(Mathf.RoundToInt(center.x), Mathf.RoundToInt(center.y)));
@@ -518,6 +823,7 @@ public class BspDungeonGenerator : MonoBehaviour
                 Vector2Int neighbor = current.Position + dir;
                 if (!IsInBounds(grid, neighbor)) continue;
                 if (closedSet.Contains(neighbor)) continue;
+                if (corridorBlockedCells.Contains(neighbor)) continue;
 
                 float moveCost = grid[neighbor.x][neighbor.y].IsWall() ? 5f : 1f;
                 float g = current.G + moveCost;
@@ -627,6 +933,12 @@ public class BspDungeonGenerator : MonoBehaviour
     {
         foreach (Leaf leaf in leaves)
         {
+            if (leaf.IsPreset)
+            {
+                StampPresetRoomIds(leaf);
+                continue;
+            }
+
             if (!leaf.roomA.HasValue) continue;
 
             if (leaf.roomShape == RoomShape.Union && leaf.roomB.HasValue)
@@ -792,6 +1104,20 @@ public class BspDungeonGenerator : MonoBehaviour
         public RectInt? roomA;
         public RectInt? roomB;
         public RoomShape roomShape;
+
+        // Salle pré-faite (Start/End, voir ApplyPreset) : motif fixe au lieu d'une forme
+        // aléatoire. `room` ne couvre que la zone intérieure réellement occupée par le modèle
+        // 3D (hors mur/porte/case de couloir, dessinés dans le motif pour la lisibilité) ;
+        // `FullFootprint` couvre le motif complet, utilisé uniquement pour bloquer le carving
+        // de couloirs sur le pourtour. ConnectorCell est l'unique case de sol en bord de motif
+        // (hors porte), visée par ConnectRooms pour relier la salle au reste du donjon.
+        public bool IsPreset;
+        public RoomType PresetType;
+        public RectInt FullFootprint;
+        public Vector2Int ConnectorCell;
+        public bool HasDoor;
+        public Vector2Int DoorCell;
+        public Vector2Int DoorAdjacentCell;
 
         public bool IsSplit => Left != null || Right != null;
 
