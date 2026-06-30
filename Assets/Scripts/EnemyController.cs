@@ -43,6 +43,9 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     [Header("Animation")]
     [SerializeField] private float moveDuration = 0.3f;
+    [Tooltip("Marge autour de l'écran (0 = exactement à l'écran, 0.1 = légèrement hors-champ). " +
+             "Les ennemis au-delà de cette marge se déplacent instantanément sans animation.")]
+    [SerializeField] private float cameraVisibilityMargin = 0.1f;
 
     // ──────────────────────────────────────────
     // État interne
@@ -238,18 +241,21 @@ public class EnemyController : MonoBehaviour, ITurnActor
         }
 
         // ── 2. Agir selon l'état ─────────────────
+        // Calculé une fois : évite de ré-évaluer la visibilité à chaque pas d'animation.
+        bool animate = IsVisibleToCamera();
+
         switch (currentState)
         {
             case EnemyState.Attack:
-                yield return StartCoroutine(DoAttack(playerGrid));
+                yield return StartCoroutine(DoAttack(playerGrid, animate));
                 break;
 
             case EnemyState.Chase:
-                yield return StartCoroutine(DoChase(playerGrid));
+                yield return StartCoroutine(DoChase(playerGrid, animate));
                 break;
 
             case EnemyState.Wander:
-                yield return StartCoroutine(DoWander());
+                yield return StartCoroutine(DoWander(animate));
                 break;
 
             default:
@@ -264,21 +270,20 @@ public class EnemyController : MonoBehaviour, ITurnActor
     // Actions
     // ──────────────────────────────────────────
 
-    private IEnumerator DoAttack(Vector2Int playerGrid)
+    private IEnumerator DoAttack(Vector2Int playerGrid, bool animate)
     {
-        // Jouer un son d'attaque avant le bump visuel
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayAttack();
 
         Debug.Log($"[{data.enemyName}] Attaque le joueur pour {data.attackDamage} dégâts !");
 
-        // Petit bump visuel vers le joueur
-        Vector3 direction = (GridToWorld(playerGrid) - transform.position).normalized;
-        Vector3 bumpTarget = transform.position + direction * (gameManager.GetStep() * 0.3f);
-        yield return StartCoroutine(AnimateBump(transform.position, bumpTarget, 0.15f));
+        if (animate)
+        {
+            Vector3 direction = (GridToWorld(playerGrid) - transform.position).normalized;
+            Vector3 bumpTarget = transform.position + direction * (gameManager.GetStep() * 0.3f);
+            yield return StartCoroutine(AnimateBump(transform.position, bumpTarget, 0.15f));
+        }
 
-        // Infliger les dégâts via HealthSystem
-        // Les sons de dégâts/mort sont gérés automatiquement par HealthSystem.OnDamaged/OnDeath
         HealthSystem playerHealth = playerTransform.GetComponent<HealthSystem>();
         if (playerHealth != null)
             playerHealth.TakeDamage(data.attackDamage);
@@ -286,13 +291,10 @@ public class EnemyController : MonoBehaviour, ITurnActor
             Debug.LogWarning("[EnemyController] Le joueur n'a pas de HealthSystem !");
     }
 
-    private IEnumerator DoChase(Vector2Int playerGrid)
+    private IEnumerator DoChase(Vector2Int playerGrid, bool animate)
     {
         Case[][] grid = gameManager.GetGridDefinition();
 
-        // Trouver le chemin vers le joueur (s'arrêter à côté, pas sur lui), en évitant les
-        // cases occupées par d'autres ennemis : si un chemin direct est bloqué, ça permet d'en
-        // chercher un autre plutôt que de simplement s'arrêter.
         List<Vector2Int> blocked = GetOtherEnemyPositions();
         List<Vector2Int> path = Pathfinder.FindPath(grid, gridPosition, playerGrid, includeGoalEvenIfWall: true, blockedCells: blocked);
 
@@ -302,21 +304,22 @@ public class EnemyController : MonoBehaviour, ITurnActor
             yield break;
         }
 
-        // Avancer d'autant de cases que le permet moveRange (sans jamais marcher sur le joueur)
-        int steps = Mathf.Min(data.moveRange, path.Count - 2); // -2 : ignorer départ et case joueur
+        int steps = Mathf.Min(data.moveRange, path.Count - 2);
         for (int i = 0; i < steps; i++)
         {
             Vector2Int next = path[i + 1];
-            yield return StartCoroutine(AnimateMove(GridToWorld(next)));
+            if (animate)
+                yield return StartCoroutine(AnimateMove(GridToWorld(next)));
+            else
+                transform.position = GridToWorld(next);
             gridPosition = next;
         }
     }
 
-    private IEnumerator DoWander()
+    private IEnumerator DoWander(bool animate)
     {
         if (patrolCells == null || patrolCells.Count == 0) yield break;
 
-        // Choisir une case aléatoire accessible dans la zone (différente de la position actuelle)
         List<Vector2Int> candidates = patrolCells.FindAll(c => c != gridPosition);
         if (candidates.Count == 0) yield break;
 
@@ -327,12 +330,14 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
         if (path == null || path.Count <= 1) yield break;
 
-        // Avancer d'au plus moveRange cases vers la cible aléatoire
         int steps = Mathf.Min(data.moveRange, path.Count - 1);
         for (int i = 0; i < steps; i++)
         {
             Vector2Int next = path[i + 1];
-            yield return StartCoroutine(AnimateMove(GridToWorld(next)));
+            if (animate)
+                yield return StartCoroutine(AnimateMove(GridToWorld(next)));
+            else
+                transform.position = GridToWorld(next);
             gridPosition = next;
         }
     }
@@ -473,6 +478,25 @@ public class EnemyController : MonoBehaviour, ITurnActor
         }
 
         transform.position = start;
+    }
+
+    // ──────────────────────────────────────────
+    // Visibilité caméra
+    // ──────────────────────────────────────────
+
+    // Retourne true si la position de l'ennemi est dans le frustum de la caméra principale,
+    // avec une marge configurable (cameraVisibilityMargin) autour des bords de l'écran.
+    // Si false, le tour s'exécute instantanément (snap) pour ne pas bloquer les autres tours.
+    private bool IsVisibleToCamera()
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return true;
+
+        Vector3 vp = cam.WorldToViewportPoint(transform.position);
+        float m = cameraVisibilityMargin;
+        return vp.z > 0f
+            && vp.x >= -m && vp.x <= 1f + m
+            && vp.y >= -m && vp.y <= 1f + m;
     }
 
     // ──────────────────────────────────────────

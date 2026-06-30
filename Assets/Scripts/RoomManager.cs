@@ -21,6 +21,10 @@ public class RoomManager : MonoBehaviour
     [Tooltip("Distance minimale (en cases) entre un point de spawn et le joueur.")]
     [SerializeField] private int minSpawnDistanceFromPlayer = 2;
 
+    [Tooltip("Marge autour de l'écran (0–0.2) utilisée pour la zone d'exclusion de spawn : " +
+             "0 = exactement l'écran, 0.1 = 10 % hors-champ exclus aussi.")]
+    [SerializeField] private float cameraSpawnMargin = 0.1f;
+
     [Header("Respawn")]
     [Tooltip("Nombre de rounds pendant lesquels le joueur doit être absent d'une salle avant qu'elle ne complète ses emplacements manquants jusqu'au maximum.")]
     [SerializeField] private int respawnDelayRounds = 5;
@@ -95,6 +99,7 @@ public class RoomManager : MonoBehaviour
         {
             if (Vector2Int.Distance(cell, playerCell) < minSpawnDistanceFromPlayer) continue;
             if (IsCellOccupied(cell, room)) continue;
+            if (IsCellVisibleToCamera(cell)) continue;
             candidates.Add(cell);
         }
 
@@ -105,6 +110,21 @@ public class RoomManager : MonoBehaviour
             candidates.RemoveAt(index);
             SpawnEnemyAt(cell, room);
         }
+    }
+
+    // Retourne true si la case est dans le champ de vision de la caméra (+ marge de sécurité).
+    // Utilisé pour empêcher les spawns visibles par le joueur.
+    private bool IsCellVisibleToCamera(Vector2Int cell)
+    {
+        Camera cam = Camera.main;
+        if (cam == null) return false;
+
+        Vector3 worldPos = GridUtils.GridToWorld(cell, gameManager.GetStep());
+        Vector3 vp = cam.WorldToViewportPoint(worldPos);
+        float m = cameraSpawnMargin;
+        return vp.z > 0f
+            && vp.x >= -m && vp.x <= 1f + m
+            && vp.y >= -m && vp.y <= 1f + m;
     }
 
     private bool IsCellOccupied(Vector2Int cell, RoomInfo room)
