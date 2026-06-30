@@ -238,6 +238,11 @@ public class GameManager : MonoBehaviour
     // ──────────────────────────────────────────
     private void Start()
     {
+        // L'AudioManager est DontDestroyOnLoad : son Start() ne retourne pas au rechargement
+        // de la scène. On force la musique d'exploration ici pour couvrir aussi le cas
+        // "retour du menu" et "redémarrage depuis l'écran de mort/fin".
+        AudioManager.Instance?.PlayMusicExploration();
+
         if (turnManager != null)
         {
             turnManager.StartGame();

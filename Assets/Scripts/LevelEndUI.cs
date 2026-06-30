@@ -18,4 +18,10 @@ public class LevelEndUI : MonoBehaviour
         if (endPanel != null)
             endPanel.SetActive(true);
     }
+
+    // Appelé par le bouton "Rejouer" du endPanel.
+    public void OnRestartClicked()  => SceneLoader.LoadDungeon();
+
+    // Appelé par le bouton "Menu Principal" du endPanel.
+    public void OnMainMenuClicked() => SceneLoader.LoadMainMenu();
 }

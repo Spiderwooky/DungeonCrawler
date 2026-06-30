@@ -29,4 +29,10 @@ public class PlayerDeathUI : MonoBehaviour
         if (deathPanel != null)
             deathPanel.SetActive(true);
     }
+
+    // Appelé par le bouton "Recommencer" du deathPanel.
+    public void OnRestartClicked()  => SceneLoader.LoadDungeon();
+
+    // Appelé par le bouton "Menu Principal" du deathPanel.
+    public void OnMainMenuClicked() => SceneLoader.LoadMainMenu();
 }
