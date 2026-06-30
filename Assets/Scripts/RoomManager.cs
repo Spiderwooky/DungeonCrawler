@@ -35,7 +35,7 @@ public class RoomManager : MonoBehaviour
     private void Start()
     {
         // S'abonner ici (pas Awake) garantit que TurnManager.Instance est déjà assigné,
-        // comme le fait CopilotPlayerController pour RegisterPlayer.
+        // comme le fait PlayerController pour RegisterPlayer.
         if (TurnManager.Instance != null)
             TurnManager.Instance.OnRoundStarted += HandleRoundStarted;
         else

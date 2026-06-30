@@ -2,7 +2,7 @@ using UnityEngine;
 
 // Écran de mort : active un panel quand le HealthSystem référencé (le joueur) déclenche
 // OnDeath. Le panel reste désactivé jusqu'à la mort ; le joueur ne peut plus bouger
-// (CopilotPlayerController.isDead), ce script ne fait qu'afficher le retour visuel.
+// (PlayerController.isDead), ce script ne fait qu'afficher le retour visuel.
 public class PlayerDeathUI : MonoBehaviour
 {
     [Header("Références")]

@@ -8,7 +8,7 @@ using UnityEngine;
 /// d'action classiques (mode hors-ligne : clé API absente ou appel réseau en échec).
 /// Le code C# reste seul décisionnaire des transactions : Claude propose un accord via
 /// sa réponse structurée, ce script vérifie l'or/l'inventaire et les bornes de prix avant
-/// d'exécuter quoi que ce soit — aucune confiance aveugle dans la sortie du modèle.
+/// d'exécuter quoi que ce soit — aucune confiance aveugle dans la sortie du modèle. 
 /// </summary>
 public class Merchant : MonoBehaviour
 {

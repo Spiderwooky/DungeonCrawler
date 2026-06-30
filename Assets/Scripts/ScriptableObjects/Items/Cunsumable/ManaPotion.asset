@@ -17,5 +17,5 @@ MonoBehaviour:
   icon: {fileID: 21300000, guid: d863a14933408f64bb5abb867bf2b9f6, type: 3}
   maxStack: 16
   baseValue: 7
-  worldPickupPrefab: {fileID: 919132149155446097, guid: 39d5c818722838e4f8ad6e9323d5dd12, type: 3}
+  worldPickupPrefab: {fileID: 82815371171145111, guid: 71564a7a58ddd964cb4793de8fac5e35, type: 3}
   healAmount: 0

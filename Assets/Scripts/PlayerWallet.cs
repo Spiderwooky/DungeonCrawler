@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// Or possédé par le joueur. À placer sur le même GameObject que Inventory
-/// (ex : CopilotPlayerController). Seule source de vérité pour les dépenses/gains —
+/// (ex : PlayerController). Seule source de vérité pour les dépenses/gains —
 /// les marchands passent toujours par TrySpend/Add, jamais par une écriture directe.
 /// </summary>
 public class PlayerWallet : MonoBehaviour

@@ -6,7 +6,7 @@ using System.Collections;
 // System). Implémente ITurnActor : termine son tour via TurnManager après un déplacement
 // ou une attaque réussis. Un bump (mur ou rotation) ne consomme pas le tour.
 [RequireComponent(typeof(PlayerInput), typeof(CharacterController), typeof(HealthSystem))]
-public class CopilotPlayerController : MonoBehaviour, ITurnActor
+public class PlayerController : MonoBehaviour, ITurnActor
 {
     [SerializeField] private GameManager gameManager;
     [SerializeField] private Inventory inventory;

@@ -56,7 +56,7 @@ public class GameManager : MonoBehaviour
     private GameObject endRoomPrefab;
 
     [Header("Clé de fin de donjon")]
-    [Tooltip("Objet nécessaire pour franchir la porte de la salle de fin. Apparaît au sol dans la salle de départ au lancement. CopilotPlayerController lit cette même référence (GetKeyItemData) pour vérifier l'inventaire du joueur.")]
+    [Tooltip("Objet nécessaire pour franchir la porte de la salle de fin. Apparaît au sol dans la salle de départ au lancement. PlayerController lit cette même référence (GetKeyItemData) pour vérifier l'inventaire du joueur.")]
     [SerializeField]
     private ItemData keyItemData;
 

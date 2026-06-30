@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // Conversion entre coordonnées grille (Vector2Int) et coordonnées monde (Vector3).
-// Centralise la formule utilisée par GameManager, EnemyController, CopilotPlayerController,
+// Centralise la formule utilisée par GameManager, EnemyController, PlayerController,
 // Inventory et WorldPickup (auparavant dupliquée dans chacun de ces scripts).
 public static class GridUtils
 {
