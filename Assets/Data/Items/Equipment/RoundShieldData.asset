@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: edbeba73d496e834d977661dd3459950, type: 3}
+  m_Name: RoundShieldData
+  m_EditorClassIdentifier: 
+  itemName: Bouclier rond
+  description: Un bouclier rond basique.
+  icon: {fileID: 21300000, guid: b53b311e31a8bee47be20eff49fe9011, type: 3}
+  maxStack: 1
+  baseValue: 10
+  worldPickupPrefab: {fileID: 1515891048673644123, guid: e43fa5f323a1c4e419d27a89d6193e84, type: 3}
+  attackBonus: 0

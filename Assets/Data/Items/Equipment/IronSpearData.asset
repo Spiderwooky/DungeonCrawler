@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: edbeba73d496e834d977661dd3459950, type: 3}
+  m_Name: IronSpearData
+  m_EditorClassIdentifier: 
+  itemName: Lance en fer
+  description: Une lance en fer basique.
+  icon: {fileID: 21300000, guid: 59b4713b2e2be6440b1462ffd6c9d391, type: 3}
+  maxStack: 1
+  baseValue: 10
+  worldPickupPrefab: {fileID: 7498777730034071049, guid: 1b40c0f582f63c2468f01e1c0a10c07d, type: 3}
+  attackBonus: 3

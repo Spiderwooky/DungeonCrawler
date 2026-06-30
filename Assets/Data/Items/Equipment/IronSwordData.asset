@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: edbeba73d496e834d977661dd3459950, type: 3}
+  m_Name: IronSwordData
+  m_EditorClassIdentifier: 
+  itemName: "\xC9p\xE9e en fer"
+  description: "Une \xE9p\xE9e en fer basique."
+  icon: {fileID: 21300000, guid: e59a890d36d85cf49985fe417569279f, type: 3}
+  maxStack: 1
+  baseValue: 10
+  worldPickupPrefab: {fileID: 1523986434878068158, guid: 58ab08e7ce2c57a48bc2f1e96d9b2650, type: 3}
+  attackBonus: 3

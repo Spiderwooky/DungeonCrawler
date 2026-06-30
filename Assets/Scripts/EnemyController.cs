@@ -144,12 +144,9 @@ public class EnemyController : MonoBehaviour, ITurnActor
         gridPosition = start;
         SnapToGrid();
 
-        Debug.Log($"[{data.enemyName}] Spawné en position grille {gridPosition}");
-
         // Pré-calcul des cases de patrouille
         Case[][] grid = gameManager.GetGridDefinition();
         patrolCells = Pathfinder.GetReachableCells(grid, patrolCenter, patrolRadius);
-        Debug.Log($"[{data.enemyName}] Zone de patrouille : {patrolCells.Count} cases autour de {patrolCenter}");
     }
 
     // Permet à un gestionnaire externe (GameManager) d'initialiser
@@ -214,8 +211,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
         else
             currentState = EnemyState.Wander;
 
-        Debug.Log($"[{data.enemyName}] État : {currentState} | Distance joueur : {GridDistance(gridPosition, playerGrid)}");
-
         // ── Transition musicale ──
         // Quand l'ennemi détecte le joueur → musique de combat
         // Quand l'ennemi perd le joueur → retour à l'exploration
@@ -270,8 +265,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayAttack();
 
-        Debug.Log($"[{data.enemyName}] Attaque le joueur pour {data.attackDamage} dégâts !");
-
         if (animate)
         {
             Vector3 direction = (GridToWorld(playerGrid) - transform.position).normalized;
@@ -293,11 +286,7 @@ public class EnemyController : MonoBehaviour, ITurnActor
         List<Vector2Int> blocked = GetOtherEnemyPositions();
         List<Vector2Int> path = Pathfinder.FindPath(grid, gridPosition, playerGrid, includeGoalEvenIfWall: true, blockedCells: blocked);
 
-        if (path == null || path.Count <= 1)
-        {
-            Debug.Log($"[{data.enemyName}] Aucun chemin vers le joueur.");
-            yield break;
-        }
+        if (path == null || path.Count <= 1) yield break;
 
         int steps = Mathf.Min(data.moveRange, path.Count - 2);
         for (int i = 0; i < steps; i++)

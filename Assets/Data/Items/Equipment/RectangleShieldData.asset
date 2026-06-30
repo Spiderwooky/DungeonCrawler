@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: edbeba73d496e834d977661dd3459950, type: 3}
+  m_Name: RectangleShieldData
+  m_EditorClassIdentifier: 
+  itemName: Bouclier rectangulaire
+  description: Un bouclier rectangulaire basique.
+  icon: {fileID: 21300000, guid: d6481c3a18295c940ac1ed2f5df39323, type: 3}
+  maxStack: 1
+  baseValue: 10
+  worldPickupPrefab: {fileID: 663853787153107035, guid: 5d2dcf5ee8518f249a4bd28358b9978b, type: 3}
+  attackBonus: 0

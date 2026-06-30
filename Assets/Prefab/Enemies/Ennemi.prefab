@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 8986926745980300050}
   - component: {fileID: 7129855603480030497}
   - component: {fileID: 1362313193870345620}
+  - component: {fileID: -705002898817660291}
   m_Layer: 0
   m_Name: Ennemi
   m_TagString: Untagged
@@ -48,9 +49,11 @@ MonoBehaviour:
   data: {fileID: 0}
   gameManager: {fileID: 0}
   playerTransform: {fileID: 0}
+  start: {x: 0, y: 0}
   patrolCenter: {x: 0, y: 0}
   patrolRadius: 3
   moveDuration: 0.3
+  cameraVisibilityMargin: 0.1
 --- !u!114 &1362313193870345620
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -64,3 +67,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 10
+  destroyOnDeath: 1
+--- !u!114 &-705002898817660291
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 88930137871074350}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e28887d897482643b95aa34f76fd8bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lootTable: {fileID: 0}

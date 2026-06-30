@@ -53,6 +53,7 @@ MonoBehaviour:
   patrolCenter: {x: 0, y: 0}
   patrolRadius: 3
   moveDuration: 0.3
+  cameraVisibilityMargin: 0.05
 --- !u!114 &2267493606774164723
 MonoBehaviour:
   m_ObjectHideFlags: 0
