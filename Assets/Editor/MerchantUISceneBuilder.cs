@@ -97,7 +97,7 @@ public static class MerchantUISceneBuilder
         if (font != null) chatLogText.font = font;
         chatLogText.fontSize = 16;
         chatLogText.alignment = TextAlignmentOptions.TopLeft;
-        chatLogText.enableWordWrapping = true;
+        chatLogText.textWrappingMode = TMPro.TextWrappingModes.Normal;
         chatLogText.text = "";
         ContentSizeFitter fitter = chatLogGo.AddComponent<ContentSizeFitter>();
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -312,7 +312,7 @@ public static class MerchantUISceneBuilder
         t.fontStyle = style;
         t.alignment = alignment;
         t.color = Color.white;
-        t.enableWordWrapping = true;
+        t.textWrappingMode = TMPro.TextWrappingModes.Normal;
         t.rectTransform.sizeDelta = new Vector2(w, h);
         return t;
     }

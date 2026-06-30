@@ -56,8 +56,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     private Vector2Int gridPosition; // Position courante en coordonnées grille
     private HealthSystem healthSystem;
-    private bool isActing; // Vrai pendant l'animation de déplacement
-
     // Cache des cases accessibles dans la zone de patrouille (calculé une fois)
     private List<Vector2Int> patrolCells;
 
@@ -202,8 +200,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     private IEnumerator TakeTurn()
     {
-        isActing = true;
-
         Vector2Int playerGrid = WorldToGrid(playerTransform.position);
 
         // ── 1. Déterminer l'état ────────────────
@@ -262,7 +258,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
                 break; // Idle : ne fait rien
         }
 
-        isActing = false;
         TurnManager.Instance?.EndTurn();
     }
 

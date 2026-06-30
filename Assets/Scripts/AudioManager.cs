@@ -84,7 +84,8 @@ public class AudioManager : MonoBehaviour
         // Devenir l'instance unique
         Instance = this;
         
-        // Persister entre les changements de scène
+        // Persister entre les changements de scène (DontDestroyOnLoad exige d'être à la racine).
+        transform.SetParent(null);
         DontDestroyOnLoad(gameObject);
 
         // ===== Créer les deux AudioSource =====
