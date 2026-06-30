@@ -202,6 +202,14 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
             return;
         }
 
+        // Si un objet destructible occupe la case cible → le briser au lieu de s'y déplacer.
+        BreakableObject breakable = GetBreakableAtPosition(targetPosition);
+        if (breakable != null)
+        {
+            StartCoroutine(BreakObject(breakable, direction));
+            return;
+        }
+
         if (IsCellWalkable(targetPosition))
         {
             StartCoroutine(MoveToPosition(targetPosition));
@@ -244,6 +252,33 @@ public class CopilotPlayerController : MonoBehaviour, ITurnActor
 
         if (levelEndUI != null)
             levelEndUI.ShowEndScreen();
+    }
+
+    // Cherche un BreakableObject dont la position grille correspond à la case cible.
+    private BreakableObject GetBreakableAtPosition(Vector3 targetPosition)
+    {
+        float step = gameManager.GetStep();
+        Vector2Int targetCell = GridUtils.WorldToGrid(targetPosition, step);
+
+        BreakableObject[] breakables = Object.FindObjectsByType<BreakableObject>(FindObjectsSortMode.None);
+        foreach (var b in breakables)
+        {
+            if (b == null) continue;
+            if (GridUtils.WorldToGrid(b.transform.position, step) == targetCell) return b;
+        }
+        return null;
+    }
+
+    // Brise un objet destructible : même animation de bump que pour un ennemi, puis appel
+    // à Break() qui déclenche son, drops et destruction. Consomme le tour.
+    private IEnumerator BreakObject(BreakableObject breakable, Vector3 direction)
+    {
+        isMoving = true;
+        yield return StartCoroutine(DoBump(direction));
+        if (breakable != null)
+            breakable.Break();
+        isMoving = false;
+        EndMyTurn();
     }
 
     // Cherche un Merchant dont la position monde correspond à la case cible.

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 69818644698421964}
   - component: {fileID: 2358027720309476421}
   - component: {fileID: 2267493606774164723}
+  - component: {fileID: 6112355663598197450}
   m_Layer: 0
   m_Name: Goblin
   m_TagString: Untagged
@@ -48,6 +49,7 @@ MonoBehaviour:
   data: {fileID: 11400000, guid: 507397f8fb5da444081cb5a63fe55b6c, type: 2}
   gameManager: {fileID: 0}
   playerTransform: {fileID: 0}
+  start: {x: 0, y: 0}
   patrolCenter: {x: 0, y: 0}
   patrolRadius: 3
   moveDuration: 0.3
@@ -64,3 +66,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 10
+  destroyOnDeath: 1
+--- !u!114 &6112355663598197450
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6291977508034074972}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e28887d897482643b95aa34f76fd8bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lootTable: {fileID: 11400000, guid: 88d1a11844ace874a9ab5fbbe3ded1cd, type: 2}

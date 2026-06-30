@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
@@ -17,14 +18,24 @@ public class WorldPickup : MonoBehaviour
     [Tooltip("Position initiale en coordonnées grille (x = colonne, y = ligne).")]
     [SerializeField] private Vector2Int start;
 
+    [Header("Animation de drop")]
+    [Tooltip("Durée de l'arc (secondes) quand l'item est éjecté d'un tonneau ou d'un ennemi.")]
+    [SerializeField] private float arcDuration = 0.35f;
+    [Tooltip("Hauteur maximale de l'arc en unités monde.")]
+    [SerializeField] private float arcHeight = 1.5f;
+
     private Vector2Int gridPosition;
     private bool registered;
+    private bool initializedBySpawn; // true quand Spawn() a déjà tout initialisé : Start() ne re-snape pas
 
     public ItemData ItemData => itemData;
     public int Amount => amount;
 
     private void Start()
     {
+        // Spawn() a déjà tout initialisé (position, enregistrement, visuel) : rien à faire.
+        if (initializedBySpawn) return;
+
         if (itemData == null)
         {
             Debug.LogError($"[WorldPickup] {name} : ItemData non assigné.");
@@ -58,7 +69,7 @@ public class WorldPickup : MonoBehaviour
         Destroy(gameObject);
     }
 
-    public static WorldPickup Spawn(ItemData data, int spawnAmount, Vector3 worldPosition, bool playDropSound = true)
+    public static WorldPickup Spawn(ItemData data, int spawnAmount, Vector3 worldPosition, bool playDropSound = true, Vector3? launchFrom = null)
     {
         if (data == null) return null;
 
@@ -97,7 +108,33 @@ public class WorldPickup : MonoBehaviour
         // objets placés par la génération de niveau, ex: la clé dans la salle de départ).
         if (playDropSound)
             AudioManager.EnsureInstance()?.PlayDropItem();
+
+        // Marquer avant l'arc : Start() ne doit pas re-snaper la position pendant l'animation.
+        pickup.initializedBySpawn = true;
+
+        if (launchFrom.HasValue)
+        {
+            Vector3 targetPosition = pickup.transform.position;
+            pickup.transform.position = launchFrom.Value;
+            pickup.StartCoroutine(pickup.ArcToPosition(launchFrom.Value, targetPosition));
+        }
+
         return pickup;
+    }
+
+    private IEnumerator ArcToPosition(Vector3 from, Vector3 to)
+    {
+        float elapsed = 0f;
+        while (elapsed < arcDuration)
+        {
+            float t = elapsed / arcDuration;
+            Vector3 pos = Vector3.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t));
+            pos.y += Mathf.Sin(t * Mathf.PI) * arcHeight;
+            transform.position = pos;
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        transform.position = to;
     }
 
     private void RegisterAtGridPosition()

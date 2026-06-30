@@ -26,6 +26,10 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private MerchantSpawner merchantSpawner;
 
+    [Tooltip("Pose des objets cassables (tonneaux, caisses…) dans les salles procédurales. Optionnel.")]
+    [SerializeField]
+    private BreakableSpawner breakableSpawner;
+
     // Case de départ du joueur, en coordonnées grille (x, z).
     // Recalculée automatiquement dans AssignStartPositionFromStartRoom() au lancement.
     [SerializeField]
@@ -129,6 +133,9 @@ public class GameManager : MonoBehaviour
         gridGenerator.GenerateGridAndTerrain(this);
         SpawnPresetRoomPrefabs();
         SpawnKeyPickup();
+
+        if (breakableSpawner != null)
+            breakableSpawner.InitializeBreakables(this, bspGenerator.GetRooms(), start);
     }
 
     // Fait apparaître la clé de fin de donjon au sol dans la salle de départ (sur une case

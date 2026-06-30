@@ -316,7 +316,7 @@ public class Inventory : MonoBehaviour
             ClearPick();
 
         Vector3 worldPos = GridUtils.GridToWorld(grid, gameManager.GetStep());
-        WorldPickup.Spawn(item, dropAmount, worldPos);
+        WorldPickup.Spawn(item, dropAmount, worldPos, launchFrom: transform.position);
         OnInventoryChanged?.Invoke();
         return true;
     }

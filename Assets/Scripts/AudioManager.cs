@@ -50,6 +50,7 @@ public class AudioManager : MonoBehaviour
     [Header("Effets sonores - Actions")]
     [SerializeField] private AudioClip sfxAttack;          // Attaque (joueur ou ennemi)
     [SerializeField] private AudioClip sfxWallBump;        // Collision avec un mur/obstacle
+    [SerializeField] private AudioClip sfxBarrelBreak;     // Bris d'un objet destructible (tonneau, caisse…)
     [SerializeField] private AudioClip[] sfxFootsteps;     // Tableau de bruits de pas (variation sonore)
 
     [Header("Effets sonores - Inventaire")]
@@ -240,6 +241,12 @@ public class AudioManager : MonoBehaviour
     public void PlayWallBump()
     {
         PlaySFX(sfxWallBump, "Collision mur");
+    }
+
+    /// <summary>Joue : bris d'un objet destructible (tonneau, caisse…)</summary>
+    public void PlayBarrelBreak()
+    {
+        PlaySFX(sfxBarrelBreak, "Bris objet");
     }
 
     /// <summary>Joue : prise d'objet dans l'inventaire</summary>
