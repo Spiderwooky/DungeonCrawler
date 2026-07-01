@@ -55,7 +55,7 @@ MonoBehaviour:
   patrolRadius: 3
   moveDuration: 0.3
   animAttackDuration: 0.4
-  cameraVisibilityMargin: 0.07
+  cameraVisibilityMargin: 0.1
 --- !u!114 &1362313193870345620
 MonoBehaviour:
   m_ObjectHideFlags: 0

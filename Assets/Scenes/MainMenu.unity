@@ -683,16 +683,16 @@ MonoBehaviour:
   sfxPlayerHit: {fileID: 8300000, guid: 6cfeea4f4d46153458c19bade1d56983, type: 3}
   sfxPlayerDeath: {fileID: 8300000, guid: 514c79a812a63cd4f8cd0f9e7bcd567f, type: 3}
   sfxEnemyDamage: {fileID: 8300000, guid: 182e78630ef17f64cb0711c268f20bbc, type: 3}
-  sfxEnemyDeath: {fileID: 8300000, guid: 182e78630ef17f64cb0711c268f20bbc, type: 3}
+  sfxEnemyDeath: {fileID: 8300000, guid: b30ec50ca08e9a043b832f4095da3698, type: 3}
   sfxAttack: {fileID: 8300000, guid: 3d97d09e92edb9d4992e602e8c18e656, type: 3}
   sfxWallBump: {fileID: 8300000, guid: 6cfeea4f4d46153458c19bade1d56983, type: 3}
-  sfxBarrelBreak: {fileID: 8300000, guid: f8b012574d214a148b8252c30757d365, type: 3}
+  sfxBarrelBreak: {fileID: 8300000, guid: 1b82f211d4d5e4548aee1ca327032639, type: 3}
   sfxFootsteps:
   - {fileID: 8300000, guid: edc647812407d25488e79c7374f86d77, type: 3}
   - {fileID: 8300000, guid: 8c049345d7195184eb159aba490b40a6, type: 3}
   - {fileID: 8300000, guid: 8c049345d7195184eb159aba490b40a6, type: 3}
-  sfxPickupItem: {fileID: 8300000, guid: f8b012574d214a148b8252c30757d365, type: 3}
-  sfxDropItem: {fileID: 8300000, guid: 6cfeea4f4d46153458c19bade1d56983, type: 3}
+  sfxPickupItem: {fileID: 8300000, guid: ae7cb1bd18c360040a5fb353386043ac, type: 3}
+  sfxDropItem: {fileID: 8300000, guid: 5009f43550eaf3a4c902c0953206bc5e, type: 3}
   musicVolume: 0.7
   sfxVolume: 1
   musicFadeDuration: 0.5
