@@ -364,7 +364,7 @@ RectTransform:
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
   m_AnchoredPosition: {x: -70, y: 0}
-  m_SizeDelta: {x: 72, y: 520}
+  m_SizeDelta: {x: 72, y: 400}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &46283306
 MonoBehaviour:
@@ -4477,6 +4477,7 @@ GameObject:
   - component: {fileID: 1069331093}
   - component: {fileID: 1069331094}
   - component: {fileID: 1069331095}
+  - component: {fileID: 1069331096}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -4604,6 +4605,21 @@ MonoBehaviour:
   enableFog: 1
   fogColor: {r: 0.058541935, g: 0.058541935, b: 0.10062885, a: 1}
   fogDensity: 0.1
+--- !u!114 &1069331096
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1069331089}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e3e8b02a74faa546ad41dcfe69df583, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  player: {fileID: 276689739}
+  fadedAlpha: 0.15
+  fadeSpeed: 8
 --- !u!1 &1093519013
 GameObject:
   m_ObjectHideFlags: 0

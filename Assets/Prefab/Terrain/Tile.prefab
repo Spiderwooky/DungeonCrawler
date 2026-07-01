@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 4574429810315596962}
   - component: {fileID: 7424394206671695613}
   - component: {fileID: 263143642268119021}
+  - component: {fileID: 1199547401089645973}
   m_Layer: 0
   m_Name: Wall-S
   m_TagString: Untagged
@@ -86,6 +87,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &1199547401089645973
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 323936654180389212}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1835342163091071970
 GameObject:
   m_ObjectHideFlags: 0
@@ -97,6 +110,7 @@ GameObject:
   - component: {fileID: 8309010392953391113}
   - component: {fileID: 3542462816255485661}
   - component: {fileID: 3420443024150813545}
+  - component: {fileID: 3038280493040702657}
   m_Layer: 0
   m_Name: Wall-N
   m_TagString: Untagged
@@ -172,6 +186,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &3038280493040702657
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1835342163091071970}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2266195499286806321
 GameObject:
   m_ObjectHideFlags: 0
@@ -183,6 +209,7 @@ GameObject:
   - component: {fileID: 3432907878919673481}
   - component: {fileID: 862024490979450189}
   - component: {fileID: 1887848550914732112}
+  - component: {fileID: 2230229493349549016}
   m_Layer: 0
   m_Name: Wall-E
   m_TagString: Untagged
@@ -258,6 +285,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &2230229493349549016
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2266195499286806321}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &3122178630852718806
 GameObject:
   m_ObjectHideFlags: 0
@@ -269,6 +308,7 @@ GameObject:
   - component: {fileID: 6300427101787509248}
   - component: {fileID: 7867921939989309473}
   - component: {fileID: 3043353728679425154}
+  - component: {fileID: 5141611285765553589}
   m_Layer: 0
   m_Name: Corner-NE
   m_TagString: Untagged
@@ -344,6 +384,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &5141611285765553589
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3122178630852718806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &4067975014731173121
 GameObject:
   m_ObjectHideFlags: 0
@@ -441,6 +493,7 @@ GameObject:
   - component: {fileID: 9174196472661817173}
   - component: {fileID: 4869666121469278303}
   - component: {fileID: 365597185565478876}
+  - component: {fileID: 4708917769922409754}
   m_Layer: 0
   m_Name: Wall-W
   m_TagString: Untagged
@@ -516,6 +569,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &4708917769922409754
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4078285037521288906}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &4816945917695088973
 GameObject:
   m_ObjectHideFlags: 0
@@ -527,6 +592,7 @@ GameObject:
   - component: {fileID: 7809738307998061894}
   - component: {fileID: 1114764573428244842}
   - component: {fileID: 5007496119648536828}
+  - component: {fileID: 7824888465000256408}
   m_Layer: 0
   m_Name: Corner-SW
   m_TagString: Untagged
@@ -602,6 +668,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &7824888465000256408
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4816945917695088973}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &6497442536950605917
 GameObject:
   m_ObjectHideFlags: 0
@@ -676,6 +754,7 @@ GameObject:
   - component: {fileID: 2497985712375265334}
   - component: {fileID: 7795209369573619105}
   - component: {fileID: 1756487466409715321}
+  - component: {fileID: 781506234743485407}
   m_Layer: 0
   m_Name: Corner-SE
   m_TagString: Untagged
@@ -751,6 +830,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &781506234743485407
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7879099619891561329}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &7888933277551909360
 GameObject:
   m_ObjectHideFlags: 0
@@ -762,6 +853,7 @@ GameObject:
   - component: {fileID: 8461724203453135021}
   - component: {fileID: 256866062468491529}
   - component: {fileID: 3281098695510879149}
+  - component: {fileID: 6674756717328902157}
   m_Layer: 0
   m_Name: Pillar
   m_TagString: Untagged
@@ -837,6 +929,18 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &6674756717328902157
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7888933277551909360}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &8019830710974138620
 GameObject:
   m_ObjectHideFlags: 0
@@ -848,6 +952,7 @@ GameObject:
   - component: {fileID: 9044722255571587899}
   - component: {fileID: 7017847527980557789}
   - component: {fileID: 6234980312855292847}
+  - component: {fileID: 600104891802183315}
   m_Layer: 0
   m_Name: Corner-NW
   m_TagString: Untagged
@@ -923,3 +1028,15 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &600104891802183315
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8019830710974138620}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22a721302805e31448b8d39cda29eb93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
