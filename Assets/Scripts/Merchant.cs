@@ -15,6 +15,10 @@ public class Merchant : MonoBehaviour
     [SerializeField] private MerchantData data;
     [SerializeField] private MerchantDialogueUI dialogueUI;
 
+    [Header("Animation (optionnel)")]
+    [Tooltip("Animator de la marchande. Paramètre attendu : trigger Interact (achat ou vente).")]
+    [SerializeField] private Animator animator;
+
     [Tooltip("Nombre de tours (joueur + marchande) conservés en mémoire pour le contexte envoyé à Claude. Au-delà, les plus anciens sont oubliés pour limiter le coût en tokens.")]
     [SerializeField] private int maxHistoryTurns = 12;
 
@@ -56,6 +60,8 @@ public class Merchant : MonoBehaviour
         foreach (MerchantStockEntry entry in data.stock)
             if (entry?.item != null)
                 runtimeStock[entry.item] = entry.stock;
+
+        animator ??= GetComponentInChildren<Animator>();
     }
 
     // ──────────────────────────────────────────
@@ -341,6 +347,7 @@ public class Merchant : MonoBehaviour
 
         playerInventory.AddItem(item, quantity);
         DecrementStock(item, quantity);
+        animator?.SetTrigger("Interact");
         dialogueUI.RefreshShopLists();
     }
 
@@ -363,6 +370,7 @@ public class Merchant : MonoBehaviour
         }
 
         playerWallet?.Add(total);
+        animator?.SetTrigger("Interact");
         dialogueUI.RefreshShopLists();
     }
 
@@ -408,6 +416,7 @@ public class Merchant : MonoBehaviour
 
         playerInventory.AddItem(item, 1);
         DecrementStock(item, 1);
+        animator?.SetTrigger("Interact");
         dialogueUI.AppendMerchantLine(data.fallbackPurchaseSuccess);
         dialogueUI.RefreshShopLists();
     }
@@ -428,6 +437,7 @@ public class Merchant : MonoBehaviour
         }
 
         playerWallet?.Add(price);
+        animator?.SetTrigger("Interact");
         dialogueUI.AppendMerchantLine(data.fallbackSaleSuccess);
         dialogueUI.RefreshShopLists();
     }

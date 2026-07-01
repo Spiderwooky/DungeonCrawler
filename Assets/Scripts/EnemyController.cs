@@ -43,6 +43,8 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     [Header("Animation")]
     [SerializeField] private float moveDuration = 0.3f;
+    [Tooltip("Durée totale (s) réservée à l'animation d'attaque. La différence avec la durée du bump (0.15 s) est attendue après le contact.")]
+    [SerializeField] private float animAttackDuration = 0.4f;
     [Tooltip("Marge autour de l'écran (0 = exactement à l'écran, 0.1 = légèrement hors-champ). " +
              "Les ennemis au-delà de cette marge se déplacent instantanément sans animation.")]
     [SerializeField] private float cameraVisibilityMargin = 0.1f;
@@ -56,6 +58,7 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     private Vector2Int gridPosition; // Position courante en coordonnées grille
     private HealthSystem healthSystem;
+    private Animator animator; // Récupéré après instanciation du modèle dans Start()
     // Cache des cases accessibles dans la zone de patrouille (calculé une fois)
     private List<Vector2Int> patrolCells;
 
@@ -94,8 +97,10 @@ public class EnemyController : MonoBehaviour, ITurnActor
             };
 
             // OnDeath : appelé quand les PV de l'ennemi tombent à 0
-            healthSystem.OnDeath += () => 
+            healthSystem.OnDeath += () =>
             {
+                animator?.SetTrigger("Death");
+
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlayEnemyDeath();
 
@@ -143,6 +148,8 @@ public class EnemyController : MonoBehaviour, ITurnActor
             Instantiate(data.model, transform.position, transform.rotation, transform);
         else
             Debug.LogWarning($"[{data.enemyName}] Aucun modèle 3D assigné dans EnemyData.");
+
+        animator = GetComponentInChildren<Animator>();
 
         // Positionnement sur la case de départ
         gridPosition = start;
@@ -269,11 +276,14 @@ public class EnemyController : MonoBehaviour, ITurnActor
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayAttack();
 
+        const float bumpDuration = 0.15f;
+
         if (animate)
         {
+            animator?.SetTrigger("Attack");
             Vector3 direction = (GridToWorld(playerGrid) - transform.position).normalized;
             Vector3 bumpTarget = transform.position + direction * (gameManager.GetStep() * 0.3f);
-            yield return StartCoroutine(AnimateBump(transform.position, bumpTarget, 0.15f));
+            yield return StartCoroutine(AnimateBump(transform.position, bumpTarget, bumpDuration));
         }
 
         HealthSystem playerHealth = playerTransform.GetComponent<HealthSystem>();
@@ -281,6 +291,14 @@ public class EnemyController : MonoBehaviour, ITurnActor
             playerHealth.TakeDamage(data.attackDamage);
         else
             Debug.LogWarning("[EnemyController] Le joueur n'a pas de HealthSystem !");
+
+        // Attendre la fin de l'animation d'attaque (le bump ne couvre que bumpDuration).
+        if (animate && animator != null)
+        {
+            float remaining = animAttackDuration - bumpDuration;
+            if (remaining > 0f)
+                yield return new WaitForSeconds(remaining);
+        }
     }
 
     private IEnumerator DoChase(Vector2Int playerGrid, bool animate)
@@ -408,10 +426,11 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
     private IEnumerator AnimateMove(Vector3 targetWorldPos)
     {
+        animator?.SetBool("IsMoving", true);
+
         Vector3 start   = transform.position;
         float   elapsed = 0f;
 
-        // Calculer la rotation cible vers la destination
         Vector3 direction = (targetWorldPos - start);
         direction.y = 0f;
 
@@ -420,7 +439,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
             Quaternion startRotation  = transform.rotation;
             Quaternion targetRotation = Quaternion.LookRotation(direction);
 
-            // Rotation et déplacement en parallèle
             while (elapsed < moveDuration)
             {
                 float t = Mathf.SmoothStep(0f, 1f, elapsed / moveDuration);
@@ -432,7 +450,6 @@ public class EnemyController : MonoBehaviour, ITurnActor
         }
         else
         {
-            // Pas de direction (cas improbable) : juste le déplacement
             while (elapsed < moveDuration)
             {
                 float t = Mathf.SmoothStep(0f, 1f, elapsed / moveDuration);
@@ -443,6 +460,7 @@ public class EnemyController : MonoBehaviour, ITurnActor
         }
 
         transform.position = targetWorldPos;
+        animator?.SetBool("IsMoving", false);
     }
 
     private IEnumerator AnimateBump(Vector3 start, Vector3 bumpTarget, float duration)

@@ -13,6 +13,8 @@ public class PlayerController : MonoBehaviour, ITurnActor
     [SerializeField] private PlayerWallet playerWallet;
 
     [Header("Animation")]
+    [Tooltip("Animator du modèle joueur. Les paramètres attendus : bool IsMoving, trigger Attack, trigger PickUp, trigger Drop, trigger Death.")]
+    [SerializeField] private Animator animator;
     [SerializeField] private float moveDuration              = 0.3f;
     [SerializeField] private float rotationDuration          = 0.2f;
     [SerializeField] private float rotationAngle             = 90f;
@@ -21,6 +23,10 @@ public class PlayerController : MonoBehaviour, ITurnActor
     [Tooltip("Multiplicateur de distance pour le bump contre un mur classique (modèle en bord de tuile, plus proche).")]
     [SerializeField] private float bumpWallDistanceMultiplier = 0.25f;
     [SerializeField] private float bumpDuration              = 0.15f;
+    [Tooltip("Durée totale (s) réservée à l'animation d'attaque. La différence avec bumpDuration est attendue après le bump.")]
+    [SerializeField] private float animAttackDuration        = 0.4f;
+    [Tooltip("Durée (s) du trigger PickUp joué après un déplacement sur un objet.")]
+    [SerializeField] private float animPickupDuration        = 0.35f;
 
     [Header("Combat")]
     [SerializeField] private int attackDamage = 2;
@@ -74,6 +80,7 @@ public class PlayerController : MonoBehaviour, ITurnActor
             healthSystem.OnDeath += () =>
             {
                 isDead = true;
+                animator?.SetTrigger("Death");
 
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlayPlayerDeath();
@@ -355,6 +362,7 @@ public class PlayerController : MonoBehaviour, ITurnActor
         if (enemy == null) yield break;
 
         isMoving = true;
+        animator?.SetTrigger("Attack");
 
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayAttack();
@@ -380,6 +388,11 @@ public class PlayerController : MonoBehaviour, ITurnActor
             Debug.LogWarning("[Player] Ennemi sans HealthSystem trouvé lors de l'attaque.");
         }
 
+        // Laisser l'animation d'attaque se terminer (le bump ne couvre que bumpDuration).
+        float remaining = animAttackDuration - bumpDuration;
+        if (animator != null && remaining > 0f)
+            yield return new WaitForSeconds(remaining);
+
         isMoving = false;
         EndMyTurn();
     }
@@ -387,32 +400,44 @@ public class PlayerController : MonoBehaviour, ITurnActor
     private IEnumerator MoveToPosition(Vector3 targetPosition)
     {
         isMoving = true;
+        animator?.SetBool("IsMoving", true);
 
-        // Jouer un bruit de pas dès que le joueur commence à se déplacer
-        // (PlayFootstep choisit aléatoirement dans le tableau sfxFootsteps)
+        // Vérifier s'il y a un objet à ramasser à destination (avant de se déplacer, pour
+        // déclencher l'animation PickUp après l'arrivée si nécessaire).
+        Vector2Int targetCell = GridUtils.WorldToGrid(targetPosition, gameManager.GetStep());
+        bool willPickup = PickupManager.Instance?.HasPickupAt(targetCell) ?? false;
+
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayFootstep();
- 
+
         Vector3 startPosition = transform.position;
         float elapsed = 0f;
- 
+
         while (elapsed < moveDuration)
         {
-            float t = Mathf.SmoothStep(0f, 1f, elapsed / moveDuration); // easing pour + de fluidité
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / moveDuration);
             Vector3 next = Vector3.Lerp(startPosition, targetPosition, t);
             characterController.Move(next - transform.position);
             elapsed += Time.deltaTime;
             yield return null;
         }
- 
-        // Snap final pour éviter le drift de position flottante
+
         characterController.enabled = false;
         transform.position = targetPosition;
         characterController.enabled = true;
- 
+
+        animator?.SetBool("IsMoving", false);
         isMoving = false;
+
         TryPickupAtCurrentCell();
-        EndMyTurn(); // ← Fin de tour après un déplacement réussi
+
+        if (willPickup && animator != null)
+        {
+            animator.SetTrigger("PickUp");
+            yield return new WaitForSeconds(animPickupDuration);
+        }
+
+        EndMyTurn();
     }
 
     private void TryPickupAtCurrentCell()
@@ -421,6 +446,12 @@ public class PlayerController : MonoBehaviour, ITurnActor
 
         Vector2Int grid = GridUtils.WorldToGrid(transform.position, gameManager.GetStep());
         PickupManager.Instance?.TryCollectAt(grid, inventory);
+    }
+
+    // Appelé par InventoryInputHandler quand le joueur jette un objet.
+    public void TriggerDropAnimation()
+    {
+        animator?.SetTrigger("Drop");
     }
  
     // Bump contre un mur : même animation aller-retour que AttackEnemy, mais avec le son

@@ -8,6 +8,7 @@ public class InventoryInputHandler : MonoBehaviour
 {
     [SerializeField] private Inventory inventory;
     [SerializeField] private InventoryUI inventoryUI;
+    [SerializeField] private PlayerController playerController;
 
     private void Awake()
     {
@@ -25,7 +26,9 @@ public class InventoryInputHandler : MonoBehaviour
     {
         if (!context.performed || inventory == null) return;
 
-        if (!inventory.DropSelectedItem())
+        if (inventory.DropSelectedItem())
+            playerController?.TriggerDropAnimation();
+        else
             Debug.Log("[Inventaire] Impossible de jeter l'objet (slot hotbar vide ou case occupée).");
     }
 
