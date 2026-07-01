@@ -16,6 +16,14 @@ public class InventorySlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, I
     [SerializeField] private Image pickHighlight;
     [SerializeField] private Image selectionHighlight;
 
+    [Header("Durabilité")]
+    [SerializeField] private GameObject durabilityBarRoot;
+    [SerializeField] private Image durabilityBarFill;
+
+    private static readonly Color DuraColorFull   = new Color(0.20f, 0.75f, 0.20f); // vert
+    private static readonly Color DuraColorMedium = new Color(0.95f, 0.60f, 0.10f); // orange
+    private static readonly Color DuraColorLow    = new Color(0.85f, 0.15f, 0.15f); // rouge
+
     private InventoryUI inventoryUI;
     private InventoryZone zone;
     private int slotIndex;
@@ -99,6 +107,7 @@ public class InventorySlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, I
         {
             if (icon != null) icon.enabled = false;
             if (amountText != null) amountText.text = string.Empty;
+            if (durabilityBarRoot != null) durabilityBarRoot.SetActive(false);
             if (slot == null || slot.IsEmpty)
             {
                 if (keyLabel != null && (zone == InventoryZone.Backpack || zone == InventoryZone.Equipment))
@@ -128,6 +137,24 @@ public class InventorySlotUI : MonoBehaviour, IBeginDragHandler, IDragHandler, I
             keyLabel.text = slot.item.itemName.Length > 0
                 ? slot.item.itemName.Substring(0, Mathf.Min(3, slot.item.itemName.Length))
                 : "?";
+        }
+
+        // Barre de durabilité : visible seulement si l'item a une durabilité < son max
+        if (durabilityBarRoot != null)
+        {
+            bool showBar = slot.item is EquipmentItemData eq
+                           && eq.maxDurability > 0
+                           && slot.currentDurability < eq.maxDurability;
+            durabilityBarRoot.SetActive(showBar);
+
+            if (showBar && durabilityBarFill != null)
+            {
+                float ratio = (float)slot.currentDurability / ((EquipmentItemData)slot.item).maxDurability;
+                durabilityBarFill.fillAmount = ratio;
+                durabilityBarFill.color = ratio > 0.6f ? DuraColorFull
+                                        : ratio > 0.3f ? DuraColorMedium
+                                        : DuraColorLow;
+            }
         }
     }
 }

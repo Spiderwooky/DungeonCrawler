@@ -69,11 +69,16 @@ public class PlayerController : MonoBehaviour, ITurnActor
         HealthSystem healthSystem = GetComponent<HealthSystem>();
         if (healthSystem != null)
         {
+            // Réduction de dégâts dynamique : toujours calculée depuis l'inventaire courant,
+            // sans cache, donc automatiquement à jour après chaque changement d'équipement.
+            healthSystem.GetDamageReduction = () => inventory?.GetEquipmentDefenseBonus() ?? 0;
+
             // OnDamaged est appelé chaque fois que le joueur reçoit des dégâts
-            healthSystem.OnDamaged += (currentHealth, maxHealth) => 
+            healthSystem.OnDamaged += (currentHealth, maxHealth) =>
             {
                 if (AudioManager.Instance != null)
                     AudioManager.Instance.PlayPlayerHit();
+                inventory?.ReduceEquippedDurability(EquipmentType.Shield);
             };
 
             // OnDeath est appelé quand les PV du joueur tombent à 0
@@ -286,7 +291,10 @@ public class PlayerController : MonoBehaviour, ITurnActor
         isMoving = true;
         yield return StartCoroutine(DoBump(direction, bumpDistanceMultiplier));
         if (breakable != null)
+        {
             breakable.Break();
+            inventory?.ReduceEquippedDurability(EquipmentType.Weapon);
+        }
         isMoving = false;
         EndMyTurn();
     }
@@ -382,6 +390,7 @@ public class PlayerController : MonoBehaviour, ITurnActor
         if (enemyHealth != null)
         {
             enemyHealth.TakeDamage(CurrentAttackDamage);
+            inventory?.ReduceEquippedDurability(EquipmentType.Weapon);
         }
         else
         {

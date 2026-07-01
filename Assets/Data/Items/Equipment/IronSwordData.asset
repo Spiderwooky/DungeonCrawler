@@ -18,4 +18,8 @@ MonoBehaviour:
   maxStack: 1
   baseValue: 10
   worldPickupPrefab: {fileID: 1523986434878068158, guid: 58ab08e7ce2c57a48bc2f1e96d9b2650, type: 3}
+  equipmentType: 0
+  maxDurability: 10
+  visualPrefab: {fileID: 1967340362664953218, guid: a38075cfbaf34a1429c46f80be4271cd, type: 3}
   attackBonus: 3
+  defenseBonus: 0

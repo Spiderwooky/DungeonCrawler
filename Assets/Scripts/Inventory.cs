@@ -8,11 +8,21 @@ public enum InventoryZone
     Equipment
 }
 
+// Limite configurable par type d'équipement (arme, bouclier…).
+[Serializable]
+public struct EquipmentTypeConfig
+{
+    public EquipmentType type;
+    [Tooltip("Nombre maximum d'items de ce type pouvant être équipés simultanément.")]
+    public int maxEquipped;
+}
+
 [Serializable]
 public class InventorySlot
 {
     public ItemData item;
     public int amount;
+    public int currentDurability; // 0 pour les items sans système de durabilité
 
     public bool IsEmpty => item == null || amount <= 0;
 
@@ -20,12 +30,14 @@ public class InventorySlot
     {
         item = null;
         amount = 0;
+        currentDurability = 0;
     }
 
     public void CopyFrom(InventorySlot other)
     {
-        item = other.item;
-        amount = other.amount;
+        item              = other.item;
+        amount            = other.amount;
+        currentDurability = other.currentDurability;
     }
 }
 
@@ -36,6 +48,10 @@ public class Inventory : MonoBehaviour
 {
     [Header("Références")]
     [SerializeField] private GameManager gameManager;
+
+    [Header("Équipement")]
+    [Tooltip("Limite par type d'équipement. Le nombre total de slots équipement = somme des maxEquipped. Si vide, 1 slot générique.")]
+    [SerializeField] private EquipmentTypeConfig[] equipmentTypeConfigs;
 
     private InventorySlot[] hotbarSlots;
     private InventorySlot[] backpackSlots;
@@ -58,13 +74,18 @@ public class Inventory : MonoBehaviour
 
     public void Configure(int hotbarCount, int backpackCount, int equipmentCount = 1)
     {
-        hotbarCount = Mathf.Max(1, hotbarCount);
-        backpackCount = Mathf.Max(1, backpackCount);
-        equipmentCount = Mathf.Max(1, equipmentCount);
+        // Si des configs de type sont définies, le nombre de slots d'équipement est la
+        // somme des maxEquipped de chaque type (ex. 1 arme + 1 bouclier = 2 slots).
+        if (equipmentTypeConfigs != null && equipmentTypeConfigs.Length > 0)
+        {
+            equipmentCount = 0;
+            foreach (EquipmentTypeConfig cfg in equipmentTypeConfigs)
+                equipmentCount += Mathf.Max(0, cfg.maxEquipped);
+        }
 
-        hotbarSlots = CreateSlots(hotbarCount);
-        backpackSlots = CreateSlots(backpackCount);
-        equipmentSlots = CreateSlots(equipmentCount);
+        hotbarSlots    = CreateSlots(Mathf.Max(1, hotbarCount));
+        backpackSlots  = CreateSlots(Mathf.Max(1, backpackCount));
+        equipmentSlots = CreateSlots(Mathf.Max(1, equipmentCount));
         ClearPick();
     }
 
@@ -155,8 +176,26 @@ public class Inventory : MonoBehaviour
         InventorySlot to = GetSlot(toZone, toIndex);
         if (from == null || to == null || from.IsEmpty) return;
 
-        // Le slot d'équipement n'accepte que les objets équipables.
-        if (toZone == InventoryZone.Equipment && !(from.item is EquipmentItemData)) return;
+        // Le slot d'équipement n'accepte que les objets équipables du bon type et dans la limite.
+        if (toZone == InventoryZone.Equipment)
+        {
+            if (!(from.item is EquipmentItemData incoming)) return;
+            if (GetTypeLimit(incoming.equipmentType) <= 0) return;
+
+            // Compter les items du même type après le déplacement (en excluant le slot
+            // source s'il vient d'un slot équipement, et le slot cible dont le contenu change).
+            int countAfter = 1;
+            for (int k = 0; k < equipmentSlots.Length; k++)
+            {
+                if (k == toIndex) continue;
+                if (fromZone == InventoryZone.Equipment && k == fromIndex) continue;
+                if (!equipmentSlots[k].IsEmpty &&
+                    equipmentSlots[k].item is EquipmentItemData eq &&
+                    eq.equipmentType == incoming.equipmentType)
+                    countAfter++;
+            }
+            if (countAfter > GetTypeLimit(incoming.equipmentType)) return;
+        }
 
         if (!to.IsEmpty && to.item == from.item)
         {
@@ -227,8 +266,9 @@ public class Inventory : MonoBehaviour
         {
             if (!slots[i].IsEmpty) continue;
             int added = Mathf.Min(item.maxStack, remaining);
-            slots[i].item = item;
+            slots[i].item   = item;
             slots[i].amount = added;
+            slots[i].currentDurability = item is EquipmentItemData eq ? eq.maxDurability : 0;
             remaining -= added;
         }
         return remaining;
@@ -327,16 +367,89 @@ public class Inventory : MonoBehaviour
     {
         if (equipmentSlots == null || equipmentSlots.Length == 0) return;
 
+        InventorySlot source = GetSlot(fromZone, fromIndex);
+        if (source == null || source.IsEmpty || !(source.item is EquipmentItemData equipment)) return;
+
+        EquipmentType type  = equipment.equipmentType;
+        int limit           = GetTypeLimit(type);
+        if (limit <= 0) return; // type non configuré : ne peut pas s'équiper
+
+        // Slot libre disponible ET limite non atteinte → y placer l'item
+        if (CountEquippedOfType(type) < limit)
+        {
+            for (int i = 0; i < equipmentSlots.Length; i++)
+            {
+                if (equipmentSlots[i].IsEmpty)
+                {
+                    MoveOrSwap(fromZone, fromIndex, InventoryZone.Equipment, i);
+                    return;
+                }
+            }
+        }
+
+        // Limite atteinte (ou pas de slot vide) → remplacer le premier item du même type
         for (int i = 0; i < equipmentSlots.Length; i++)
         {
-            if (equipmentSlots[i].IsEmpty)
+            if (!equipmentSlots[i].IsEmpty &&
+                equipmentSlots[i].item is EquipmentItemData eq &&
+                eq.equipmentType == type)
             {
                 MoveOrSwap(fromZone, fromIndex, InventoryZone.Equipment, i);
                 return;
             }
         }
+    }
 
-        MoveOrSwap(fromZone, fromIndex, InventoryZone.Equipment, 0);
+    // Réduit la durabilité de tous les équipements du type donné actuellement équipés.
+    // L'item se casse (slot vidé) quand la durabilité atteint 0.
+    // Sans effet si maxDurability == 0 (item indestructible).
+    public void ReduceEquippedDurability(EquipmentType type, int amount = 1)
+    {
+        if (equipmentSlots == null) return;
+        bool changed = false;
+
+        for (int i = 0; i < equipmentSlots.Length; i++)
+        {
+            InventorySlot slot = equipmentSlots[i];
+            if (slot.IsEmpty) continue;
+            if (!(slot.item is EquipmentItemData eq)) continue;
+            if (eq.equipmentType != type) continue;
+            if (eq.maxDurability <= 0) continue;
+
+            slot.currentDurability = Mathf.Max(0, slot.currentDurability - amount);
+            changed = true;
+
+            if (slot.currentDurability == 0)
+            {
+                Debug.Log($"[Inventory] {eq.itemName} s'est cassé !");
+                slot.Clear();
+            }
+        }
+
+        if (changed) OnInventoryChanged?.Invoke();
+    }
+
+    private int GetTypeLimit(EquipmentType type)
+    {
+        if (equipmentTypeConfigs == null || equipmentTypeConfigs.Length == 0)
+            return 1; // fallback : 1 slot générique si rien n'est configuré
+        foreach (EquipmentTypeConfig cfg in equipmentTypeConfigs)
+        {
+            if (cfg.type == type) return Mathf.Max(0, cfg.maxEquipped);
+        }
+        return 0; // type absent des configs : non équipable
+    }
+
+    private int CountEquippedOfType(EquipmentType type)
+    {
+        if (equipmentSlots == null) return 0;
+        int count = 0;
+        foreach (InventorySlot slot in equipmentSlots)
+        {
+            if (!slot.IsEmpty && slot.item is EquipmentItemData eq && eq.equipmentType == type)
+                count++;
+        }
+        return count;
     }
 
     // Somme des bonus d'attaque de tout ce qui est actuellement équipé.
@@ -349,6 +462,20 @@ public class Inventory : MonoBehaviour
         {
             if (!slot.IsEmpty && slot.item is EquipmentItemData equipment)
                 total += equipment.attackBonus;
+        }
+        return total;
+    }
+
+    // Somme des bonus de défense (réduction de dégâts reçus) de tout ce qui est équipé.
+    public int GetEquipmentDefenseBonus()
+    {
+        if (equipmentSlots == null) return 0;
+
+        int total = 0;
+        foreach (InventorySlot slot in equipmentSlots)
+        {
+            if (!slot.IsEmpty && slot.item is EquipmentItemData equipment)
+                total += equipment.defenseBonus;
         }
         return total;
     }

@@ -23,6 +23,10 @@ public class HealthSystem : MonoBehaviour
     public int MaxHealth     => maxHealth;
     public bool IsDead       => CurrentHealth <= 0;
 
+    // Délégué optionnel retournant la réduction de dégâts à appliquer avant de soustraire.
+    // Branché par PlayerController via l'inventaire ; null pour les ennemis (pas de réduction).
+    public Func<int> GetDamageReduction { get; set; }
+
     // ──────────────────────────────────────────
     // Initialisation
     // ──────────────────────────────────────────
@@ -48,8 +52,10 @@ public class HealthSystem : MonoBehaviour
     {
         if (IsDead) return;
 
-        CurrentHealth = Mathf.Max(0, CurrentHealth - amount);
-        Debug.Log($"[HealthSystem] {gameObject.name} subit {amount} dégâts → {CurrentHealth}/{maxHealth} PV");
+        int reduction = GetDamageReduction?.Invoke() ?? 0;
+        int effective = Mathf.Max(1, amount - reduction); // au moins 1 dégât passe toujours
+        CurrentHealth = Mathf.Max(0, CurrentHealth - effective);
+        Debug.Log($"[HealthSystem] {gameObject.name} subit {effective} dégâts (bruts : {amount}, armure : {reduction}) → {CurrentHealth}/{maxHealth} PV");
 
         OnDamaged?.Invoke(CurrentHealth, maxHealth);
 
