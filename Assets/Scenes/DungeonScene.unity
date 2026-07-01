@@ -1627,7 +1627,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f3b7771f06946674896afc8964dc6bb2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 0
+  maxHealth: 50
   destroyOnDeath: 0
 --- !u!114 &276689747
 MonoBehaviour:
@@ -3904,6 +3904,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
+--- !u!1 &900857213
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 900857215}
+  - component: {fileID: 900857214}
+  m_Layer: 0
+  m_Name: TorchSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &900857214
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 900857213}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e8f21ef7c8703b4bb42fdf6b1b056de, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  entries:
+  - prefab: {fileID: 8795836507916553987, guid: 56a00fb2ebd4de14a9c80059e114d0c6, type: 3}
+    roomSpawnChance: 0.7
+    minPerRoom: 1
+    maxPerRoom: 10
+    minSpacingCells: 2
+    wallHeight: 2
+  corridorEntry:
+    prefab: {fileID: 8795836507916553987, guid: 56a00fb2ebd4de14a9c80059e114d0c6, type: 3}
+    spawnChancePerCell: 0.12
+    minSpacingCells: 4
+    wallHeight: 2
+--- !u!4 &900857215
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 900857213}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1069331091}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &902148884
 GameObject:
   m_ObjectHideFlags: 0
@@ -4420,6 +4476,7 @@ GameObject:
   - component: {fileID: 1069331092}
   - component: {fileID: 1069331093}
   - component: {fileID: 1069331094}
+  - component: {fileID: 1069331095}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -4457,6 +4514,7 @@ Transform:
   - {fileID: 2022274439}
   - {fileID: 911532778}
   - {fileID: 1918806514}
+  - {fileID: 900857215}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1069331092
@@ -4477,6 +4535,7 @@ MonoBehaviour:
   roomManager: {fileID: 2022274438}
   merchantSpawner: {fileID: 911532777}
   breakableSpawner: {fileID: 1918806513}
+  torchSpawner: {fileID: 900857214}
   start: {x: 1, y: 1}
   step: 4
   terrain: {fileID: 1473142879}
@@ -4508,8 +4567,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05f36fd1512f2e64ebcaf81b158e19b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 50
-  height: 50
+  width: 25
+  height: 25
   minLeafSize: 6
   minRoomSize: 3
   maxRoomSize: 10
@@ -4528,6 +4587,23 @@ MonoBehaviour:
   emptyRoomChance: 0.25
   gizmoCellSize: 4
   drawGizmosInEditor: 0
+--- !u!114 &1069331095
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1069331089}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1aa31ce3995e84c479d777ad98a35aa6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ambientColor: {r: 0.16731928, g: 0.16731928, b: 0.3773585, a: 1}
+  cameraBackground: {r: 0.05882353, g: 0.05882353, b: 0.101960786, a: 1}
+  enableFog: 1
+  fogColor: {r: 0.058541935, g: 0.058541935, b: 0.10062885, a: 1}
+  fogDensity: 0.1
 --- !u!1 &1093519013
 GameObject:
   m_ObjectHideFlags: 0

@@ -30,6 +30,10 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private BreakableSpawner breakableSpawner;
 
+    [Tooltip("Pose des torches sur les murs des salles procédurales. Optionnel.")]
+    [SerializeField]
+    private TorchSpawner torchSpawner;
+
     // Case de départ du joueur, en coordonnées grille (x, z).
     // Recalculée automatiquement dans AssignStartPositionFromStartRoom() au lancement.
     [SerializeField]
@@ -136,6 +140,9 @@ public class GameManager : MonoBehaviour
 
         if (breakableSpawner != null)
             breakableSpawner.InitializeBreakables(this, bspGenerator.GetRooms(), start);
+
+        if (torchSpawner != null)
+            torchSpawner.InitializeTorches(this, bspGenerator.GetRooms(), start);
     }
 
     // Fait apparaître la clé de fin de donjon au sol dans la salle de départ (sur une case
