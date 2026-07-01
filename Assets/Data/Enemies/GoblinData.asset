@@ -20,3 +20,5 @@ MonoBehaviour:
   moveRange: 1
   detectionRadius: 4
   attackRadius: 1
+  isSpecialEnemy: 0
+  turnActivationDistance: 12
