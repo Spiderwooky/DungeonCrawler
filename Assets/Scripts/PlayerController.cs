@@ -291,10 +291,7 @@ public class PlayerController : MonoBehaviour, ITurnActor
         isMoving = true;
         yield return StartCoroutine(DoBump(direction, bumpDistanceMultiplier));
         if (breakable != null)
-        {
             breakable.Break();
-            inventory?.ReduceEquippedDurability(EquipmentType.Weapon);
-        }
         isMoving = false;
         EndMyTurn();
     }
