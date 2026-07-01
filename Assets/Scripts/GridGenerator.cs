@@ -136,8 +136,9 @@ public class GridGenerator : MonoBehaviour
 
     private bool IsWallAt(int x, int z)
     {
+        // Hors-grille = mur implicite : l'extérieur du donjon est toujours solide.
         if (x < 0 || z < 0 || x >= grid.Length || z >= grid[x].Length)
-            return false;
+            return true;
 
         Case cell = grid[x][z];
         return cell != null && cell.IsWall();
