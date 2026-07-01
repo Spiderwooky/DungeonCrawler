@@ -122,6 +122,23 @@ public class BspDungeonGenerator : MonoBehaviour
         "WWWGWWW",
     };
 
+    // Salle du boss (13 × 10). Le connecteur est au sud (bord bas, col 6).
+    // Nécessite des feuilles BSP ≥ 13 × 10 : augmenter width/height (~30×22) et
+    // minLeafSize (~7) dans l'Inspector de BspDungeonGenerator pour une placement fiable.
+    private static readonly string[] BossRoomPattern =
+    {
+        "WWWWWWWWWWWWW",
+        "WWWGGGGGGGWWW",
+        "WWGGGGGGGGGWW",
+        "WWGGWGGGWGGWW",
+        "WGGGGGGGGGGGW",
+        "WGGGWGGGWGGGW",
+        "WWGGWGGGWGGWW",
+        "WWGGGGGGGGGWW",
+        "WWWGGGGGGGWWW",
+        "WWWWWWGWWWWWW",
+    };
+
     private void Awake()
     {
         GenerateDungeon();
@@ -273,9 +290,41 @@ public class BspDungeonGenerator : MonoBehaviour
             Debug.LogWarning($"[BspDungeonGenerator] Aucune paire de feuilles BSP assez grandes et assez éloignées ({EndRoomPattern[0].Length}x{EndRoomPattern.Length} requis pour la fin) : pas de salle de fin cette partie. Augmentez width/height si besoin.");
         }
 
+        // ── Salle du boss : loin du Start, différente de Start et End ──────────────
+        if (startLeaf != null)
+        {
+            Vector2 startCenter = new Vector2(startLeaf.x + startLeaf.width / 2f, startLeaf.z + startLeaf.height / 2f);
+            var bossCandidates = FindCandidatesWithRotations(leaves, BossRoomPattern);
+            bossCandidates.RemoveAll(c => c.leaf == startLeaf || c.leaf == endLeaf);
+
+            Leaf bossLeaf = null;
+            float bestBossDist = -1f;
+            foreach ((Leaf b, _) in bossCandidates)
+            {
+                float dist = LeafCenterDistance(b, startCenter);
+                if (dist > bestBossDist) { bestBossDist = dist; bossLeaf = b; }
+            }
+
+            if (bossLeaf != null)
+            {
+                List<int> bossRots = bossCandidates.Find(c => c.leaf == bossLeaf).validRotations;
+                // Connecteur pointé vers le Start : le joueur entre par le côté « départ ».
+                int bossRot = ChooseBestRotation(bossLeaf, bossRots, startLeaf, BossRoomPattern);
+                ApplyPreset(bossLeaf, BossRoomPattern, RoomType.Boss, bossRot);
+            }
+            else
+            {
+                Debug.LogWarning($"[BspDungeonGenerator] Aucune feuille disponible pour la salle du boss ({BossRoomPattern[0].Length}×{BossRoomPattern.Length} requis). " +
+                    "Augmentez width/height (~30×22) et minLeafSize (~7) dans l'Inspector de BspDungeonGenerator.");
+            }
+        }
+
+        // Bloquer les footprints APRÈS tous les ApplyPreset (Clear() doit précéder tous les Block).
         corridorBlockedCells.Clear();
-        if (startLeaf != null) BlockFootprintForCorridors(startLeaf);
-        if (endLeaf != null)   BlockFootprintForCorridors(endLeaf);
+        foreach (Leaf leaf in leaves)
+        {
+            if (leaf.IsPreset) BlockFootprintForCorridors(leaf);
+        }
     }
 
     // Pour chaque feuille, liste les rotations (0-3) pour lesquelles le motif tient dans la
@@ -616,7 +665,8 @@ public class BspDungeonGenerator : MonoBehaviour
         // placée, sinon (grille trop petite) on retombe sur l'ancienne heuristique pour Start
         // et il n'y a simplement pas de salle End.
         Leaf startLeaf = leaves.Find(l => l.IsPreset && l.PresetType == RoomType.Start) ?? FindStartLeaf(leaves);
-        Leaf endLeaf = leaves.Find(l => l.IsPreset && l.PresetType == RoomType.End);
+        Leaf endLeaf   = leaves.Find(l => l.IsPreset && l.PresetType == RoomType.End);
+        Leaf bossLeaf  = leaves.Find(l => l.IsPreset && l.PresetType == RoomType.Boss);
 
         rooms = new List<RoomInfo>();
         foreach (Leaf leaf in leaves)
@@ -625,8 +675,9 @@ public class BspDungeonGenerator : MonoBehaviour
             if (!cellsByRoomId.TryGetValue(leaf.Id, out List<Vector2Int> roomCells) || roomCells.Count == 0) continue;
 
             RoomType type;
-            if (leaf == startLeaf) type = RoomType.Start;
-            else if (leaf == endLeaf) type = RoomType.End;
+            if (leaf == startLeaf)     type = RoomType.Start;
+            else if (leaf == endLeaf)  type = RoomType.End;
+            else if (leaf == bossLeaf) type = RoomType.Boss;
             else type = random.NextDouble() < emptyRoomChance ? RoomType.Empty : RoomType.Monster;
 
             int maxEnemies = type == RoomType.Monster

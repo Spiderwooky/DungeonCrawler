@@ -6,6 +6,7 @@ public enum RoomType
 {
     Start,   // Salle de départ du joueur : jamais de monstres ni d'objets.
     End,     // Salle de fin du donjon : jamais de monstres ni d'objets.
+    Boss,    // Salle du boss : contient un ennemi unique qui droppera la clé. Pas de repop.
     Monster, // Salle pouvant contenir des ennemis, avec repop après un délai.
     Empty,   // Salle sans monstres, pour varier le rythme d'exploration.
 }

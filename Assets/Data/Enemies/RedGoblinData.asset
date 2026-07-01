@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b06352514b721b44a910f926d19509a5, type: 3}
+  m_Name: RedGoblinData
+  m_EditorClassIdentifier: 
+  enemyName: Goblin Rouge
+  description: Un grand goblin rouge, plus fort qu'un goblin normal.
+  model: {fileID: 2045303780457863836, guid: e1263557342c3a342b219cd88016525b, type: 3}
+  maxHealth: 25
+  attackDamage: 3
+  moveRange: 1
+  detectionRadius: 4
+  attackRadius: 1
+  isSpecialEnemy: 1
+  turnActivationDistance: 8

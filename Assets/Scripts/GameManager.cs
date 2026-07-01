@@ -59,8 +59,17 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private GameObject endRoomPrefab;
 
+    [Tooltip("Prefab instancié à l'emplacement de la salle du boss (motif fixe BossRoomPattern dans BspDungeonGenerator).")]
+    [SerializeField]
+    private GameObject bossRoomPrefab;
+
+    [Header("Boss")]
+    [Tooltip("Prefab de l'ennemi boss, instancié au centre de la salle du boss. Son LootDropper doit contenir la clé dans sa LootTable.")]
+    [SerializeField]
+    private GameObject bossEnemyPrefab;
+
     [Header("Clé de fin de donjon")]
-    [Tooltip("Objet nécessaire pour franchir la porte de la salle de fin. Apparaît au sol dans la salle de départ au lancement. PlayerController lit cette même référence (GetKeyItemData) pour vérifier l'inventaire du joueur.")]
+    [Tooltip("Objet nécessaire pour franchir la porte de la salle de fin. Droppé par le boss à sa mort. PlayerController lit cette référence (GetKeyItemData) pour vérifier l'inventaire du joueur.")]
     [SerializeField]
     private ItemData keyItemData;
 
@@ -136,7 +145,7 @@ public class GameManager : MonoBehaviour
 
         gridGenerator.GenerateGridAndTerrain(this);
         SpawnPresetRoomPrefabs();
-        SpawnKeyPickup();
+        SpawnBossEnemy();
 
         if (breakableSpawner != null)
             breakableSpawner.InitializeBreakables(this, bspGenerator.GetRooms(), start);
@@ -145,27 +154,20 @@ public class GameManager : MonoBehaviour
             torchSpawner.InitializeTorches(this, bspGenerator.GetRooms(), start);
     }
 
-    // Fait apparaître la clé de fin de donjon au sol dans la salle de départ (sur une case
-    // différente de celle où le joueur démarre, pour qu'il doive la ramasser explicitement).
-    private void SpawnKeyPickup()
+    // Instancie le boss au centre de sa salle. L'ennemi s'enregistre lui-même auprès de
+    // TurnManager via EnemyController.Start(). Son LootDropper doit contenir la clé dans sa
+    // LootTable pour que la clé drope à sa mort.
+    private void SpawnBossEnemy()
     {
-        if (keyItemData == null) return;
+        if (bossEnemyPrefab == null) return;
 
         System.Collections.Generic.List<RoomInfo> rooms = bspGenerator.GetRooms();
-        RoomInfo startRoom = rooms.Find(r => r.Type == RoomType.Start);
-        if (startRoom == null || startRoom.Cells.Count == 0) return;
+        RoomInfo bossRoom = rooms?.Find(r => r.Type == RoomType.Boss);
+        if (bossRoom == null || bossRoom.Cells.Count == 0) return;
 
-        Vector2Int cell = startRoom.Cells[0];
-        foreach (Vector2Int c in startRoom.Cells)
-        {
-            if (c != start)
-            {
-                cell = c;
-                break;
-            }
-        }
-
-        WorldPickup.Spawn(keyItemData, 1, GridUtils.GridToWorld(cell, step), playDropSound: false);
+        Vector2Int cell = bossRoom.Cells[bossRoom.Cells.Count / 2];
+        Vector3 worldPos = GridUtils.GridToWorld(cell, step);
+        Instantiate(bossEnemyPrefab, worldPos, Quaternion.identity);
     }
 
     // Instancie les prefabs de salles pré-faites (Start/End) à l'emplacement choisi par
@@ -176,22 +178,42 @@ public class GameManager : MonoBehaviour
     {
         System.Collections.Generic.List<RoomInfo> rooms = bspGenerator.GetRooms();
         SpawnPresetRoomPrefab(rooms, RoomType.Start, startRoomPrefab);
-        SpawnPresetRoomPrefab(rooms, RoomType.End, endRoomPrefab);
+        SpawnPresetRoomPrefab(rooms, RoomType.End,   endRoomPrefab);
+        GameObject bossInstance = SpawnPresetRoomPrefab(rooms, RoomType.Boss, bossRoomPrefab);
+        if (bossInstance != null)
+            ConfigurePresetRoomEnemies(bossInstance);
     }
 
-    private void SpawnPresetRoomPrefab(System.Collections.Generic.List<RoomInfo> rooms, RoomType type, GameObject prefab)
+    private GameObject SpawnPresetRoomPrefab(System.Collections.Generic.List<RoomInfo> rooms, RoomType type, GameObject prefab)
     {
-        if (prefab == null) return;
+        if (prefab == null) return null;
 
         RoomInfo room = rooms.Find(r => r.Type == type);
-        if (room == null) return;
+        if (room == null) return null;
 
         // PivotCell : case de la grille où est ancré le coin local (0,0) du prefab.
         // Rotation : N × 90° CW autour de ce pivot pour aligner le modèle 3D avec le motif.
         Vector3 worldPos = new Vector3(room.PivotCell.x * step, 0f, room.PivotCell.y * step);
         Quaternion rot   = Quaternion.Euler(0f, room.Rotation * 90f, 0f);
 
-        Instantiate(prefab, worldPos, rot, terrain.transform);
+        return Instantiate(prefab, worldPos, rot, terrain.transform);
+    }
+
+    // Injecte les références de scène (GameManager, joueur) sur tous les EnemyController
+    // enfants d'un prefab de salle pré-faite. Les ennemis embarqués dans un prefab ne peuvent
+    // pas référencer des objets de scène directement ; on le fait ici après instanciation,
+    // comme RoomManager.SpawnEnemyAt le fait pour les salles procédurales.
+    private void ConfigurePresetRoomEnemies(GameObject roomInstance)
+    {
+        PlayerController player = Object.FindAnyObjectByType<PlayerController>();
+        Transform playerTransform = player != null ? player.transform : null;
+
+        foreach (EnemyController enemy in roomInstance.GetComponentsInChildren<EnemyController>())
+        {
+            enemy.Configure(this, playerTransform);
+            Vector2Int cell = GridUtils.WorldToGrid(enemy.transform.position, step);
+            enemy.SetStartAndPatrol(cell, cell);
+        }
     }
 
     // Place le point de départ du joueur dans la salle taguée RoomType.Start par le générateur,

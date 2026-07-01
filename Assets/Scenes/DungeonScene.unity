@@ -6028,6 +6028,8 @@ MonoBehaviour:
   floorPrefab: {fileID: 6497442536950605917, guid: 74b508f76eae25845ae23531972aa326, type: 3}
   startRoomPrefab: {fileID: 5410785683206972528, guid: cd3a1228d9340b041bf62701ee7b166c, type: 3}
   endRoomPrefab: {fileID: 3408213913375146341, guid: f6cf4f61351b8924297080ba6b7c5bc4, type: 3}
+  bossRoomPrefab: {fileID: 2113126583053867098, guid: 3241f36b679049f458eae67692402c70, type: 3}
+  bossEnemyPrefab: {fileID: 0}
   keyItemData: {fileID: 11400000, guid: 396483a582828754f9e247f235f1f503, type: 2}
 --- !u!114 &1069331093
 MonoBehaviour:
@@ -6053,9 +6055,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 05f36fd1512f2e64ebcaf81b158e19b2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 25
-  height: 25
-  minLeafSize: 6
+  width: 35
+  height: 35
+  minLeafSize: 7
   minRoomSize: 3
   maxRoomSize: 10
   roomShape: 3
