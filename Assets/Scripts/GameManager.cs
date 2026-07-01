@@ -186,12 +186,12 @@ public class GameManager : MonoBehaviour
         RoomInfo room = rooms.Find(r => r.Type == type);
         if (room == null) return;
 
-        // Origine = coin sud-ouest de la salle (case xMin,yMin = case en bas à gauche du
-        // motif ASCII) : le prefab doit avoir son pivot sur cette case, pas au centre.
-        RectInt bounds = room.Bounds;
-        Vector3 worldPos = new Vector3(bounds.xMin * step, 0f, bounds.yMin * step);
+        // PivotCell : case de la grille où est ancré le coin local (0,0) du prefab.
+        // Rotation : N × 90° CW autour de ce pivot pour aligner le modèle 3D avec le motif.
+        Vector3 worldPos = new Vector3(room.PivotCell.x * step, 0f, room.PivotCell.y * step);
+        Quaternion rot   = Quaternion.Euler(0f, room.Rotation * 90f, 0f);
 
-        Instantiate(prefab, worldPos, Quaternion.identity, terrain.transform);
+        Instantiate(prefab, worldPos, rot, terrain.transform);
     }
 
     // Place le point de départ du joueur dans la salle taguée RoomType.Start par le générateur,

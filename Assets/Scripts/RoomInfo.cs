@@ -26,12 +26,18 @@ public class RoomInfo
     public readonly Vector2Int? DoorCell;
     public readonly Vector2Int? DoorAdjacentCell;
 
+    // Salles pré-faites seulement : pivot du prefab 3D dans la grille, et rotation appliquée
+    // (N × 90° CW). GameManager instancie le prefab à PivotCell avec Quaternion.Euler(0, Rotation*90, 0).
+    public readonly Vector2Int PivotCell;
+    public readonly int Rotation;
+
     // État runtime suivi par RoomManager.
     public readonly List<EnemyController> AliveEnemies = new List<EnemyController>();
     public int LastRoundPlayerPresent;
 
     public RoomInfo(int id, RoomType type, List<Vector2Int> cells, RectInt bounds, int maxEnemies,
-        Vector2Int? doorCell = null, Vector2Int? doorAdjacentCell = null)
+        Vector2Int? doorCell = null, Vector2Int? doorAdjacentCell = null,
+        Vector2Int pivotCell = default, int rotation = 0)
     {
         Id = id;
         Type = type;
@@ -40,5 +46,7 @@ public class RoomInfo
         MaxEnemies = maxEnemies;
         DoorCell = doorCell;
         DoorAdjacentCell = doorAdjacentCell;
+        PivotCell = pivotCell;
+        Rotation = rotation;
     }
 }

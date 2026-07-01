@@ -225,20 +225,21 @@ public class BspDungeonGenerator : MonoBehaviour
     // CreateRooms/BuildRoomInfos retombent alors sur le comportement aléatoire habituel.
     private void ReservePresetRooms(List<Leaf> leaves)
     {
-        List<Leaf> startCandidates = FindCandidateLeaves(leaves, StartRoomPattern);
-        List<Leaf> endCandidates = FindCandidateLeaves(leaves, EndRoomPattern);
+        var startCandidates = FindCandidatesWithRotations(leaves, StartRoomPattern);
+        var endCandidates   = FindCandidatesWithRotations(leaves, EndRoomPattern);
 
         Leaf startLeaf = null;
-        Leaf endLeaf = null;
+        Leaf endLeaf   = null;
         float bestDistance = -1f;
 
-        foreach (Leaf a in startCandidates)
+        // Étape 1 : trouver la paire de feuilles qui maximise la distance (indépendamment de
+        // la rotation — les rotations valides sont évaluées dans l'étape suivante).
+        foreach ((Leaf a, _) in startCandidates)
         {
             Vector2 centerA = new Vector2(a.x + a.width / 2f, a.z + a.height / 2f);
-            foreach (Leaf b in endCandidates)
+            foreach ((Leaf b, _) in endCandidates)
             {
                 if (a == b) continue;
-
                 float distance = LeafCenterDistance(b, centerA);
                 if (distance > bestDistance)
                 {
@@ -251,45 +252,105 @@ public class BspDungeonGenerator : MonoBehaviour
 
         if (startLeaf != null)
         {
-            ApplyPreset(startLeaf, StartRoomPattern, RoomType.Start);
+            // Étape 2 : parmi les rotations valides de chaque feuille, choisir celle dont le
+            // connecteur pointe le plus vers l'autre salle (couloirs plus directs).
+            List<int> startRots = startCandidates.Find(c => c.leaf == startLeaf).validRotations;
+            List<int> endRots   = endCandidates  .Find(c => c.leaf == endLeaf)  .validRotations;
+
+            int startRot = ChooseBestRotation(startLeaf, startRots, endLeaf,   StartRoomPattern);
+            int endRot   = ChooseBestRotation(endLeaf,   endRots,   startLeaf, EndRoomPattern);
+
+            ApplyPreset(startLeaf, StartRoomPattern, RoomType.Start, startRot);
+            ApplyPreset(endLeaf,   EndRoomPattern,   RoomType.End,   endRot);
         }
         else
         {
             Debug.LogWarning($"[BspDungeonGenerator] Aucune feuille BSP assez grande ({StartRoomPattern[0].Length}x{StartRoomPattern.Length} requis) pour la salle de départ pré-faite : repli sur une salle générée aléatoirement. Augmentez width/height si besoin.");
         }
 
-        if (endLeaf != null)
-        {
-            ApplyPreset(endLeaf, EndRoomPattern, RoomType.End);
-        }
-        else
+        if (endLeaf == null)
         {
             Debug.LogWarning($"[BspDungeonGenerator] Aucune paire de feuilles BSP assez grandes et assez éloignées ({EndRoomPattern[0].Length}x{EndRoomPattern.Length} requis pour la fin) : pas de salle de fin cette partie. Augmentez width/height si besoin.");
         }
 
         corridorBlockedCells.Clear();
         if (startLeaf != null) BlockFootprintForCorridors(startLeaf);
-        if (endLeaf != null) BlockFootprintForCorridors(endLeaf);
+        if (endLeaf != null)   BlockFootprintForCorridors(endLeaf);
     }
 
-    private List<Leaf> FindCandidateLeaves(List<Leaf> leaves, string[] pattern)
+    // Pour chaque feuille, liste les rotations (0-3) pour lesquelles le motif tient dans la
+    // feuille ET dont le connecteur a de la place à l'extérieur de la grille.
+    private List<(Leaf leaf, List<int> validRotations)> FindCandidatesWithRotations(
+        List<Leaf> leaves, string[] originalPattern)
     {
-        int neededWidth = pattern[0].Length;
-        int neededHeight = pattern.Length;
-        (int connectorRow, int connectorCol) = FindConnectorPosition(pattern);
-
-        List<Leaf> candidates = new List<Leaf>();
+        var result = new List<(Leaf, List<int>)>();
         foreach (Leaf leaf in leaves)
         {
             if (leaf.IsPreset) continue;
-            if (leaf.width < neededWidth || leaf.height < neededHeight) continue;
-            // Rejette les feuilles où le connecteur (toujours sur un bord du motif) finirait
-            // collé au bord de la grille : son unique voisin extérieur doit rester dans la
-            // grille, sinon aucun couloir ne peut jamais l'atteindre.
-            if (!HasRoomForConnectorOutside(leaf, pattern, connectorRow, connectorCol)) continue;
-            candidates.Add(leaf);
+
+            var validRots = new List<int>();
+            string[] current = originalPattern;
+            for (int rot = 0; rot < 4; rot++)
+            {
+                if (rot > 0) current = RotatePatternCW(current);
+                if (leaf.width  < current[0].Length) continue;
+                if (leaf.height < current.Length)    continue;
+
+                (int connRow, int connCol) = FindConnectorPosition(current);
+                if (!HasRoomForConnectorOutside(leaf, current, connRow, connCol)) continue;
+
+                validRots.Add(rot);
+            }
+            if (validRots.Count > 0) result.Add((leaf, validRots));
         }
-        return candidates;
+        return result;
+    }
+
+    // Parmi les rotations valides, choisit celle dont la direction du connecteur pointe le
+    // plus vers la feuille cible (maximise le produit scalaire avec le vecteur inter-centres).
+    private int ChooseBestRotation(Leaf leaf, List<int> validRotations, Leaf target, string[] originalPattern)
+    {
+        if (validRotations.Count == 1) return validRotations[0];
+
+        Vector2 toTarget = (new Vector2(target.x + target.width  / 2f, target.z + target.height / 2f)
+                          - new Vector2(leaf.x   + leaf.width    / 2f, leaf.z   + leaf.height   / 2f)).normalized;
+
+        (int connRow, int connCol) = FindConnectorPosition(originalPattern);
+        Vector2Int baseDir = GetOutwardDirection(connRow, connCol, originalPattern.Length);
+        Vector2 baseDirV   = new Vector2(baseDir.x, baseDir.y);
+
+        int bestRot = validRotations[0];
+        float bestDot = float.MinValue;
+        foreach (int rot in validRotations)
+        {
+            float dot = Vector2.Dot(toTarget, RotateVec90CW(baseDirV, rot));
+            if (dot > bestDot) { bestDot = dot; bestRot = rot; }
+        }
+        return bestRot;
+    }
+
+    // Rotation d'un vecteur 2D de `times` × 90° horaire dans le plan XZ.
+    private static Vector2 RotateVec90CW(Vector2 v, int times)
+    {
+        for (int i = 0; i < times; i++)
+            v = new Vector2(v.y, -v.x);
+        return v;
+    }
+
+    // Retourne le motif tourné de 90° dans le sens horaire (lignes → colonnes, sens inverse).
+    // new[newRow][newCol] = original[H-1-newCol][newRow]
+    private static string[] RotatePatternCW(string[] pattern)
+    {
+        int H = pattern.Length;
+        int W = pattern[0].Length;
+        char[][] result = new char[W][];
+        for (int newRow = 0; newRow < W; newRow++)
+        {
+            result[newRow] = new char[H];
+            for (int newCol = 0; newCol < H; newCol++)
+                result[newRow][newCol] = pattern[H - 1 - newCol][newRow];
+        }
+        return System.Array.ConvertAll(result, row => new string(row));
     }
 
     // Trouve la position (ligne, colonne) de l'unique case de sol en bord de motif (hors
@@ -367,22 +428,66 @@ public class BspDungeonGenerator : MonoBehaviour
         }
     }
 
-    // Carve immédiatement le motif fixe dans `grid` (avant que CreateRooms n'assigne les
-    // Id de salle) et mémorise sur la feuille : `room` = la zone intérieure réellement
-    // occupée par le modèle 3D (bounding box des cases de sol hors case de connexion en bord
-    // de motif — c'est plus petit que le motif dessiné, qui inclut aussi mur/porte/couloir
-    // pour la lisibilité du schéma), `FullFootprint` = le motif complet (pour le blocage de
-    // couloirs), et la porte (case + case intérieure adjacente, pour GameManager).
-    private void ApplyPreset(Leaf leaf, string[] pattern, RoomType type)
+    // Calcule la position du pivot du prefab 3D pour la rotation N d'un motif original W×H.
+    // Quand on tourne le prefab de N×90° CW autour de ce pivot, ses cellules s'alignent
+    // exactement sur les cases de la grille inscrites par ApplyPreset.
+    private Vector2Int ComputePivotCell(Leaf leaf, string[] originalPattern, int rotation)
     {
-        int patternWidth = pattern[0].Length;
+        int W = originalPattern[0].Length;
+        int H = originalPattern.Length;
+
+        // Offset du coin intérieur sud-ouest dans le motif NON tourné
+        // (dMinX = colonnes depuis l'origine, dMinZ = lignes depuis le bas)
+        int dMinX = int.MaxValue, dMinZ = int.MaxValue;
+        for (int row = 0; row < H; row++)
+        {
+            int zOff = H - 1 - row;
+            for (int col = 0; col < W; col++)
+            {
+                if (originalPattern[row][col] == 'G' && !IsBoundaryCell(row, col, W, H))
+                {
+                    if (col  < dMinX) dMinX = col;
+                    if (zOff < dMinZ) dMinZ = zOff;
+                }
+            }
+        }
+
+        int ox = leaf.x + (leaf.width  - W) / 2;
+        int oz = leaf.z + (leaf.height - H) / 2;
+        // Pour 90°/270° les dimensions du motif s'inversent, donc l'origine aussi.
+        int newOx = (rotation % 2 == 0) ? ox : leaf.x + (leaf.width  - H) / 2;
+        int newOz = (rotation % 2 == 0) ? oz : leaf.z + (leaf.height - W) / 2;
+
+        return (rotation % 4) switch
+        {
+            1 => new Vector2Int(newOx + dMinZ,         newOz + W - 1 - dMinX),
+            2 => new Vector2Int(ox   + W - 1 - dMinX,  oz   + H - 1 - dMinZ),
+            3 => new Vector2Int(newOx + H - 1 - dMinZ, newOz + dMinX),
+            _ => new Vector2Int(ox   + dMinX,           oz   + dMinZ),
+        };
+    }
+
+    // Inscrit le motif pré-fait (potentiellement tourné) dans la grille et renseigne la feuille :
+    // `room` = bounding box des cases sol intérieures (hors connexion/bordure, utilisée par le
+    // prefab 3D), `FullFootprint` = empreinte complète (pour bloquer les couloirs), `PivotCell`
+    // = point d'ancrage du prefab calculé par ComputePivotCell, et porte (case + case adjacente).
+    private void ApplyPreset(Leaf leaf, string[] originalPattern, RoomType type, int rotation = 0)
+    {
+        // Tourner le motif avant de l'inscrire dans la grille
+        string[] pattern = originalPattern;
+        for (int i = 0; i < rotation; i++)
+            pattern = RotatePatternCW(pattern);
+
+        int patternWidth  = pattern[0].Length;
         int patternHeight = pattern.Length;
 
         ComputePresetOrigin(leaf, patternWidth, patternHeight, out int originX, out int originZ);
 
-        leaf.IsPreset = true;
-        leaf.PresetType = type;
-        leaf.FullFootprint = new RectInt(originX, originZ, patternWidth, patternHeight);
+        leaf.IsPreset       = true;
+        leaf.PresetType     = type;
+        leaf.PresetRotation = rotation;
+        leaf.PivotCell      = ComputePivotCell(leaf, originalPattern, rotation);
+        leaf.FullFootprint  = new RectInt(originX, originZ, patternWidth, patternHeight);
 
         int innerMinX = int.MaxValue, innerMinZ = int.MaxValue;
         int innerMaxX = int.MinValue, innerMaxZ = int.MinValue;
@@ -531,7 +636,12 @@ public class BspDungeonGenerator : MonoBehaviour
             Vector2Int? doorCell = leaf.HasDoor ? leaf.DoorCell : (Vector2Int?)null;
             Vector2Int? doorAdjacentCell = leaf.HasDoor ? leaf.DoorAdjacentCell : (Vector2Int?)null;
 
-            rooms.Add(new RoomInfo(leaf.Id, type, roomCells, leaf.room.Value, maxEnemies, doorCell, doorAdjacentCell));
+            Vector2Int pivotCell = leaf.IsPreset
+                ? leaf.PivotCell
+                : new Vector2Int(leaf.room.Value.xMin, leaf.room.Value.yMin);
+
+            rooms.Add(new RoomInfo(leaf.Id, type, roomCells, leaf.room.Value, maxEnemies,
+                doorCell, doorAdjacentCell, pivotCell, leaf.IsPreset ? leaf.PresetRotation : 0));
         }
     }
 
@@ -1113,6 +1223,8 @@ public class BspDungeonGenerator : MonoBehaviour
         // (hors porte), visée par ConnectRooms pour relier la salle au reste du donjon.
         public bool IsPreset;
         public RoomType PresetType;
+        public int PresetRotation;      // 0-3 × 90° CW appliqués au motif ASCII
+        public Vector2Int PivotCell;    // point d'ancrage du prefab 3D (calculé par ComputePivotCell)
         public RectInt FullFootprint;
         public Vector2Int ConnectorCell;
         public bool HasDoor;
