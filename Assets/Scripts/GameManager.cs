@@ -34,6 +34,10 @@ public class GameManager : MonoBehaviour
     [SerializeField]
     private TorchSpawner torchSpawner;
 
+    [Tooltip("Pose des bestioles d'ambiance sur les cases sol du donjon. Optionnel.")]
+    [SerializeField]
+    private CritterSpawner critterSpawner;
+
     // Case de départ du joueur, en coordonnées grille (x, z).
     // Recalculée automatiquement dans AssignStartPositionFromStartRoom() au lancement.
     [SerializeField]
@@ -152,6 +156,9 @@ public class GameManager : MonoBehaviour
 
         if (torchSpawner != null)
             torchSpawner.InitializeTorches(this, bspGenerator.GetRooms(), start);
+
+        if (critterSpawner != null)
+            critterSpawner.InitializeCritters(this, bspGenerator.GetRooms(), start);
     }
 
     // Instancie le boss au centre de sa salle. L'ennemi s'enregistre lui-même auprès de
