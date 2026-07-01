@@ -42,6 +42,13 @@ public class HealthBarUI : MonoBehaviour
         Refresh();
     }
 
+    private static Color HealthColor(float ratio)
+    {
+        if (ratio > 0.5f)
+            return Color.Lerp(Color.yellow, Color.green, (ratio - 0.5f) * 2f);
+        return Color.Lerp(Color.red, Color.yellow, ratio * 2f);
+    }
+
     private void Refresh()
     {
         if (healthSystem == null) return;
@@ -51,7 +58,10 @@ public class HealthBarUI : MonoBehaviour
             : 0f;
 
         if (fillImage != null)
+        {
             fillImage.fillAmount = ratio;
+            fillImage.color = HealthColor(ratio);
+        }
 
         if (valueText != null)
             valueText.text = $"{healthSystem.CurrentHealth}/{healthSystem.MaxHealth}";

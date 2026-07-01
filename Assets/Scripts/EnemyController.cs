@@ -77,6 +77,10 @@ public class EnemyController : MonoBehaviour, ITurnActor
 
         healthSystem?.Initialize(data.maxHealth);
 
+        EnemyHealthBar healthBar = GetComponentInChildren<EnemyHealthBar>(true);
+        if (healthBar != null && healthSystem != null)
+            healthBar.Initialize(healthSystem, data.isSpecialEnemy);
+
         // ── Intégration audio ──
         // S'abonner aux événements de santé de cet ennemi
         // Permet de jouer les sons d'impact et de mort automatiquement
