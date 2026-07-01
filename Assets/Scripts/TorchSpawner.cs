@@ -39,6 +39,11 @@ public class TorchSpawner : MonoBehaviour
     [Tooltip("Laisser le prefab vide pour désactiver les torches de couloir.")]
     [SerializeField] private TorchCorridorEntry corridorEntry;
 
+    [Header("Placement")]
+    [Tooltip("Fraction du pas de grille utilisée pour coller la torche à la face du mur (0.5 = exactement au bord de la case, < 0.5 = en retrait).")]
+    [Range(0f, 0.5f)]
+    [SerializeField] private float wallFaceOffset = 0.45f;
+
     private static readonly Vector2Int[] Directions =
     {
         Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right
@@ -79,7 +84,8 @@ public class TorchSpawner : MonoBehaviour
         {
             foreach (Vector2Int dir in Directions)
             {
-                if (IsWall(cell + dir, grid))
+                Vector2Int neighbor = cell + dir;
+                if (IsWall(neighbor, grid) && !IsIsolatedWall(neighbor, grid))
                 {
                     candidates.Add((cell, dir));
                     break;
@@ -110,7 +116,7 @@ public class TorchSpawner : MonoBehaviour
 
             // Position : sur la face du mur (case sol + déplacement vers le mur), à hauteur de mur
             Vector3 groundWorldPos = GridUtils.GridToWorld(cell, step);
-            Vector3 wallOffset     = new Vector3(wallDir.x, 0f, wallDir.y) * step * 0.45f;
+            Vector3 wallOffset     = new Vector3(wallDir.x, 0f, wallDir.y) * step * wallFaceOffset;
             Vector3 torchPos       = groundWorldPos + wallOffset + Vector3.up * entry.wallHeight;
 
             // Orientation : face à l'intérieur de la salle (inverse de la direction mur)
@@ -144,7 +150,8 @@ public class TorchSpawner : MonoBehaviour
 
                 foreach (Vector2Int dir in Directions)
                 {
-                    if (IsWall(cell + dir, grid))
+                    Vector2Int neighbor = cell + dir;
+                    if (IsWall(neighbor, grid) && !IsIsolatedWall(neighbor, grid))
                     {
                         candidates.Add((cell, dir));
                         break;
@@ -172,7 +179,7 @@ public class TorchSpawner : MonoBehaviour
             if (tooClose) continue;
 
             Vector3 groundWorldPos = GridUtils.GridToWorld(cell, step);
-            Vector3 wallOffset     = new Vector3(wallDir.x, 0f, wallDir.y) * step * 0.45f;
+            Vector3 wallOffset     = new Vector3(wallDir.x, 0f, wallDir.y) * step * wallFaceOffset;
             Vector3 torchPos       = groundWorldPos + wallOffset + Vector3.up * entry.wallHeight;
 
             Vector3 facing = new Vector3(-wallDir.x, 0f, -wallDir.y);
@@ -189,6 +196,24 @@ public class TorchSpawner : MonoBehaviour
         if (cell.y < 0 || cell.y >= grid[cell.x].Length) return true;
         Case c = grid[cell.x][cell.y];
         return c == null || c.IsWall();
+    }
+
+    // Vrai si la case est un mur entouré de sol sur ses 4 côtés (pilier isolé).
+    // Un pilier a son modèle 3D au centre de sa propre case, pas en bord de tuile :
+    // l'offset standard des torches ne s'y applique pas.
+    private static bool IsIsolatedWall(Vector2Int cell, Case[][] grid)
+    {
+        if (cell.x < 0 || cell.x >= grid.Length) return false;
+        if (cell.y < 0 || cell.y >= grid[cell.x].Length) return false;
+        if (!grid[cell.x][cell.y].IsWall()) return false;
+
+        foreach (Vector2Int d in Directions)
+        {
+            Vector2Int n = cell + d;
+            if (n.x < 0 || n.x >= grid.Length || n.y < 0 || n.y >= grid[n.x].Length) return false;
+            if (!grid[n.x][n.y].IsGround()) return false;
+        }
+        return true;
     }
 
     private static int GridDistance(Vector2Int a, Vector2Int b)

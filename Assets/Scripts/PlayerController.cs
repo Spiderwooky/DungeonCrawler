@@ -13,11 +13,14 @@ public class PlayerController : MonoBehaviour, ITurnActor
     [SerializeField] private PlayerWallet playerWallet;
 
     [Header("Animation")]
-    [SerializeField] private float moveDuration         = 0.3f;
-    [SerializeField] private float rotationDuration     = 0.2f;
-    [SerializeField] private float rotationAngle        = 90f;
-    [SerializeField] private float bumpDistanceMultiplier = 0.25f;
-    [SerializeField] private float bumpDuration         = 0.15f;
+    [SerializeField] private float moveDuration              = 0.3f;
+    [SerializeField] private float rotationDuration          = 0.2f;
+    [SerializeField] private float rotationAngle             = 90f;
+    [Tooltip("Multiplicateur de distance pour le bump contre un ennemi, un destructible ou un pilier (obstacle au centre de la case).")]
+    [SerializeField] private float bumpDistanceMultiplier    = 0.40f;
+    [Tooltip("Multiplicateur de distance pour le bump contre un mur classique (modèle en bord de tuile, plus proche).")]
+    [SerializeField] private float bumpWallDistanceMultiplier = 0.25f;
+    [SerializeField] private float bumpDuration              = 0.15f;
 
     [Header("Combat")]
     [SerializeField] private int attackDamage = 2;
@@ -274,7 +277,7 @@ public class PlayerController : MonoBehaviour, ITurnActor
     private IEnumerator BreakObject(BreakableObject breakable, Vector3 direction)
     {
         isMoving = true;
-        yield return StartCoroutine(DoBump(direction));
+        yield return StartCoroutine(DoBump(direction, bumpDistanceMultiplier));
         if (breakable != null)
             breakable.Break();
         isMoving = false;
@@ -315,11 +318,11 @@ public class PlayerController : MonoBehaviour, ITurnActor
     }
 
     // Anime un aller-retour vers `direction` (sans déplacer réellement le joueur).
-    // Partagé par BumpAgainstWall (collision) et AttackEnemy (coup porté).
-    private IEnumerator DoBump(Vector3 direction)
+    // Partagé par BumpAgainstWall (collision), AttackEnemy et BreakObject.
+    private IEnumerator DoBump(Vector3 direction, float distanceMultiplier)
     {
         Vector3 start = transform.position;
-        Vector3 bumpTarget = start + direction * gameManager.GetStep() * bumpDistanceMultiplier;
+        Vector3 bumpTarget = start + direction * gameManager.GetStep() * distanceMultiplier;
         float half = bumpDuration * 0.5f;
         float elapsed = 0f;
 
@@ -356,7 +359,7 @@ public class PlayerController : MonoBehaviour, ITurnActor
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayAttack();
 
-        yield return StartCoroutine(DoBump(direction));
+        yield return StartCoroutine(DoBump(direction, bumpDistanceMultiplier));
 
         // L'ennemi peut avoir été détruit pendant l'animation (ex: tué par un coup précédent,
         // son délai de destruction s'écoule pendant ce bump) : revérifier avant GetComponent.
@@ -422,6 +425,8 @@ public class PlayerController : MonoBehaviour, ITurnActor
  
     // Bump contre un mur : même animation aller-retour que AttackEnemy, mais avec le son
     // de collision. Ne termine PAS le tour : le joueur peut réessayer immédiatement.
+    // Utilise un multiplicateur plus petit pour les murs classiques (modèle en bord de tuile)
+    // et le multiplicateur standard pour les piliers isolés (modèle au centre de leur case).
     private IEnumerator BumpAgainstWall(Vector3 direction)
     {
         isMoving = true;
@@ -429,9 +434,31 @@ public class PlayerController : MonoBehaviour, ITurnActor
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayWallBump();
 
-        yield return StartCoroutine(DoBump(direction));
+        float mult = IsTargetIsolatedPillar(direction) ? bumpDistanceMultiplier : bumpWallDistanceMultiplier;
+        yield return StartCoroutine(DoBump(direction, mult));
 
         isMoving = false;
+    }
+
+    // Vrai si la case dans `direction` est un pilier isolé (case mur entourée de sol sur 4 côtés).
+    private bool IsTargetIsolatedPillar(Vector3 direction)
+    {
+        float step = gameManager.GetStep();
+        Vector2Int target = GridUtils.WorldToGrid(transform.position + direction * step, step);
+        Case[][] grid = gameManager.GetGridDefinition();
+
+        if (target.x < 0 || target.x >= grid.Length) return false;
+        if (target.y < 0 || target.y >= grid[target.x].Length) return false;
+        if (!grid[target.x][target.y].IsWall()) return false;
+
+        Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+        foreach (Vector2Int d in dirs)
+        {
+            Vector2Int n = target + d;
+            if (n.x < 0 || n.x >= grid.Length || n.y < 0 || n.y >= grid[n.x].Length) return false;
+            if (!grid[n.x][n.y].IsGround()) return false;
+        }
+        return true;
     }
  
     // ──────────────────────────────────────────
