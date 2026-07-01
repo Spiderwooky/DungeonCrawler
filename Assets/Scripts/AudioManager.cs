@@ -100,6 +100,12 @@ public class AudioManager : MonoBehaviour
         sfxSource.loop = false;            // Les SFX ne jouent qu'une fois
         sfxSource.volume = sfxVolume;
 
+        // Charger les préférences sauvegardées (remplacent les valeurs par défaut sérialisées)
+        musicVolume = PlayerPrefs.GetFloat(PrefKeyMusic, musicVolume);
+        sfxVolume   = PlayerPrefs.GetFloat(PrefKeySFX,   sfxVolume);
+        musicSource.volume = musicVolume;
+        sfxSource.volume   = sfxVolume;
+
         Debug.Log("[AudioManager] Singleton initialisé et prêt.");
     }
 
@@ -174,11 +180,12 @@ public class AudioManager : MonoBehaviour
     private IEnumerator FadeMusicTransition(AudioClip newMusic, string contextName = "")
     {
         // === FADE OUT (réduction du volume) ===
+        // unscaledDeltaTime : la transition fonctionne même quand le jeu est en pause (timeScale = 0).
         float startVolume = musicSource.volume;
         float elapsed = 0f;
         while (elapsed < musicFadeDuration && musicSource.isPlaying)
         {
-            elapsed += Time.deltaTime;
+            elapsed += Time.unscaledDeltaTime;
             musicSource.volume = Mathf.Lerp(startVolume, 0, elapsed / musicFadeDuration);
             yield return null;
         }
@@ -187,14 +194,14 @@ public class AudioManager : MonoBehaviour
         musicSource.clip = newMusic;
         musicSource.Play();
         currentMusic = newMusic;
-        
+
         Debug.Log($"[AudioManager] Musique changée : {contextName}");
 
         // === FADE IN (augmentation du volume) ===
         elapsed = 0f;
         while (elapsed < musicFadeDuration)
         {
-            elapsed += Time.deltaTime;
+            elapsed += Time.unscaledDeltaTime;
             musicSource.volume = Mathf.Lerp(0, musicVolume, elapsed / musicFadeDuration);
             yield return null;
         }
@@ -300,20 +307,31 @@ public class AudioManager : MonoBehaviour
     // UTILITAIRES (accesseurs publics)
     // ──────────────────────────────────────────
 
+    private const string PrefKeyMusic = "Settings_MusicVolume";
+    private const string PrefKeySFX   = "Settings_SFXVolume";
+
     /// <summary>Retourne true si actuellement en musique de combat</summary>
     public bool IsInCombat => inCombat;
 
-    /// <summary>Règle le volume des musiques (0 à 1)</summary>
+    /// <summary>Volume actuel des musiques (0 à 1)</summary>
+    public float MusicVolume => musicVolume;
+
+    /// <summary>Volume actuel des effets sonores (0 à 1)</summary>
+    public float SFXVolume => sfxVolume;
+
+    /// <summary>Règle le volume des musiques (0 à 1) et sauvegarde dans PlayerPrefs</summary>
     public void SetMusicVolume(float volume)
     {
         musicVolume = Mathf.Clamp01(volume);
         if (musicSource != null) musicSource.volume = musicVolume;
+        PlayerPrefs.SetFloat(PrefKeyMusic, musicVolume);
     }
 
-    /// <summary>Règle le volume des effets sonores (0 à 1)</summary>
+    /// <summary>Règle le volume des effets sonores (0 à 1) et sauvegarde dans PlayerPrefs</summary>
     public void SetSFXVolume(float volume)
     {
         sfxVolume = Mathf.Clamp01(volume);
         if (sfxSource != null) sfxSource.volume = sfxVolume;
+        PlayerPrefs.SetFloat(PrefKeySFX, sfxVolume);
     }
 }
